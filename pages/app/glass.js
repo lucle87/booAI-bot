@@ -1,9 +1,13 @@
-import { useState, useRef } from 'react';
+"use client";
+
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ethers } from 'ethers';
 import { useWallet } from '../../hooks/useWallet';
 import { useDeploy } from '../../hooks/useDeploy';
 import { CHAINS } from '../../lib/config';
+import { ClientErrorBoundary } from '../../components/ClientErrorBoundary';
 
 const initialAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"}]';
 const initialBytecode = '0x6003600501';
@@ -20,7 +24,7 @@ const networkOptions = [
   { key: 'abstractTestnet', icon: '🧩' },
 ];
 
-export default function GlassApp() {
+function GlassAppComponent() {
   const { account, chainId, error, connectMetaMask, connectOkxWallet, connectWalletConnect, switchToAbstract } = useWallet();
   const { deploying, contractAddress, deployError, deployContract } = useDeploy();
   const [selectedTab, setSelectedTab] = useState('solidity');
@@ -37,6 +41,23 @@ export default function GlassApp() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const walletProvider = window.ethereum || window.okxwallet;
+      if (walletProvider) {
+        const browserProvider = new ethers.BrowserProvider(walletProvider);
+        setProvider(browserProvider);
+        setSigner(browserProvider.getSigner());
+      }
+    }
+  }, []);
+
+  if (!mounted) return null;
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
@@ -106,8 +127,6 @@ export default function GlassApp() {
     await handleDeploy();
   };
 
-  const provider = typeof window !== 'undefined' && window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
-
   const handleReview = async () => {
     setReview('');
     setReviewError(null);
@@ -133,7 +152,7 @@ export default function GlassApp() {
   };
 
   const handleDeploy = async () => {
-    await deployContract({ signer: provider ? provider.getSigner() : null, abi, bytecode });
+    await deployContract({ signer, abi, bytecode });
   };
 
   const sendChat = async (text) => {
@@ -167,8 +186,9 @@ export default function GlassApp() {
   };
 
   return (
-    <main
-      style={{
+    <ClientErrorBoundary>
+      <main
+        style={{
         minHeight: '100vh',
         background: 'radial-gradient(circle at top, rgba(79, 88, 255, 0.16), transparent 31%), linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(20, 30, 70, 0.95))',
         color: '#f2f7ff',
@@ -467,5 +487,8 @@ export default function GlassApp() {
         }
       `}</style>
     </main>
+    </ClientErrorBoundary>
   );
 }
+
+export default dynamic(() => Promise.resolve(GlassAppComponent), { ssr: false });

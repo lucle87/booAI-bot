@@ -1,9 +1,13 @@
-import { useState, useRef } from 'react';
+"use client";
+
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ethers } from 'ethers';
 import { useWallet } from '../../hooks/useWallet';
 import { useDeploy } from '../../hooks/useDeploy';
 import { CHAINS } from '../../lib/config';
+import { ClientErrorBoundary } from '../../components/ClientErrorBoundary';
 
 const initialAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"}]';
 const initialBytecode = '0x6003600501';
@@ -20,7 +24,7 @@ const networkOptions = [
   { key: 'abstractTestnet', icon: '🧩' },
 ];
 
-export default function LightApp() {
+function LightAppComponent() {
   const { account, chainId, error, connectMetaMask, connectOkxWallet, connectWalletConnect, switchToAbstract } = useWallet();
   const { deploying, contractAddress, deployError, deployContract } = useDeploy();
   const [selectedTab, setSelectedTab] = useState('solidity');
@@ -37,6 +41,23 @@ export default function LightApp() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const walletProvider = window.ethereum || window.okxwallet;
+      if (walletProvider) {
+        const browserProvider = new ethers.BrowserProvider(walletProvider);
+        setProvider(browserProvider);
+        setSigner(browserProvider.getSigner());
+      }
+    }
+  }, []);
+
+  if (!mounted) return null;
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
@@ -106,9 +127,6 @@ export default function LightApp() {
     await handleDeploy();
   };
 
-  const provider = typeof window !== 'undefined' && window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
-  const signer = provider ? provider.getSigner() : null;
-
   const handleReview = async () => {
     setReview('');
     setReviewError(null);
@@ -168,7 +186,8 @@ export default function LightApp() {
   };
 
   return (
-    <main style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #eff7ff 0%, #d9e9ff 100%)', color: '#122b55' }}>
+    <ClientErrorBoundary>
+      <main style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #eff7ff 0%, #d9e9ff 100%)', color: '#122b55' }}>
       <header className="header">
         <div>
           <div className="brand" style={{ fontSize: '1.5rem', color: '#122b55' }}>booAI_bot</div>
@@ -451,5 +470,8 @@ export default function LightApp() {
         }
       `}</style>
     </main>
+    </ClientErrorBoundary>
   );
 }
+
+export default dynamic(() => Promise.resolve(LightAppComponent), { ssr: false });

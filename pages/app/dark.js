@@ -1,9 +1,13 @@
-import { useState, useRef } from 'react';
+"use client";
+
+import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ethers } from 'ethers';
 import { useWallet } from '../../hooks/useWallet';
 import { useDeploy } from '../../hooks/useDeploy';
 import { CHAINS } from '../../lib/config';
+import { ClientErrorBoundary } from '../../components/ClientErrorBoundary';
 
 const initialAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"}]';
 const initialBytecode = '0x6003600501';
@@ -20,7 +24,7 @@ const networkOptions = [
   { key: 'abstractTestnet', icon: '🧩' },
 ];
 
-export default function DarkApp() {
+function DarkAppComponent() {
   const { account, chainId, error, connectMetaMask, connectOkxWallet, connectWalletConnect, switchToAbstract } = useWallet();
   const { deploying, contractAddress, deployError, deployContract } = useDeploy();
   const [selectedTab, setSelectedTab] = useState('solidity');
@@ -37,6 +41,23 @@ export default function DarkApp() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
+
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const walletProvider = window.ethereum || window.okxwallet;
+      if (walletProvider) {
+        const browserProvider = new ethers.BrowserProvider(walletProvider);
+        setProvider(browserProvider);
+        setSigner(browserProvider.getSigner());
+      }
+    }
+  }, []);
+
+  if (!mounted) return null;
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
@@ -162,13 +183,12 @@ export default function DarkApp() {
   };
 
   const handleDeploy = async () => {
-    await deployContract({ signer: provider ? provider.getSigner() : null, abi, bytecode });
+    await deployContract({ signer, abi, bytecode });
   };
 
-  const provider = typeof window !== 'undefined' && window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
-
   return (
-    <main style={{ minHeight: '100vh', background: 'radial-gradient(circle at top, rgba(162, 76, 255, 0.16), transparent 28%), linear-gradient(180deg, #09070d 0%, #040205 100%)', color: '#f6f6ff' }}>
+    <ClientErrorBoundary>
+      <main style={{ minHeight: '100vh', background: 'radial-gradient(circle at top, rgba(162, 76, 255, 0.16), transparent 28%), linear-gradient(180deg, #09070d 0%, #040205 100%)', color: '#f6f6ff' }}>
       <header className="header">
         <div>
           <div className="brand" style={{ fontSize: '1.5rem' }}>booAI_bot</div>
@@ -451,5 +471,8 @@ export default function DarkApp() {
         }
       `}</style>
     </main>
+    </ClientErrorBoundary>
   );
 }
+
+export default dynamic(() => Promise.resolve(DarkAppComponent), { ssr: false });
