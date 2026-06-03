@@ -107,6 +107,8 @@ WHEN ALL INFO IS COLLECTED respond ONLY with this JSON (no markdown, no extra te
     } catch {
       parsed = null
     }
+    console.log('RAW TEXT FROM GROQ:', rawText)
+console.log('PARSED:', parsed)
 
     if (parsed?.ready) {
       return res.status(200).json({
