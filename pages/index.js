@@ -9,7 +9,7 @@ const networks = [
   { id: 'optimism', icon: '🔵', name: 'Optimism', status: 'Soon' },
   { id: 'base', icon: '🟤', name: 'Base', status: 'Soon' },
   { id: 'avalanche', icon: '🟥', name: 'Avalanche', status: 'Soon' },
-  { id: 'abstractTestnet', icon: '🧩', name: 'Abstract Testnet', status: 'Live' },
+  { id: 'arcTestnet', icon: '⬡', name: 'ARC Testnet', status: 'Live' },
 ];
 
 export default function Home() {
@@ -147,17 +147,24 @@ export default function Home() {
         <div className="header" style={{ alignItems: 'flex-start' }}>
           <div>
             <h2 className="section-title">Multi-Chain Support</h2>
-            <p className="section-text">Start with Abstract Testnet. More chains coming soon.</p>
           </div>
         </div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
           {networks.map((network) => (
-            <div key={network.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div key={network.id} className="card" style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '1rem',
+              ...(network.status === 'Live' && {
+                border: '1px solid rgba(155, 127, 255, 0.5)',
+                background: 'rgba(155, 127, 255, 0.08)'
+              })
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
                 <span style={{ fontSize: '1.6rem' }}>{network.icon}</span>
                 <div>
                   <h3 style={{ margin: 0 }}>{network.name}</h3>
-                  <p style={{ margin: 0, color: '#a9b2d4', fontSize: '0.95rem' }}>{network.id === 'abstractTestnet' ? 'Live deployment support' : 'Coming soon'}</p>
+                  <p style={{ margin: 0, color: '#a9b2d4', fontSize: '0.95rem' }}>{network.status === 'Live' ? 'Live deployment support' : 'Coming soon'}</p>
                 </div>
               </div>
               <span className="tag" style={{ background: network.status === 'Live' ? '#2bad6f' : 'rgba(255, 255, 255, 0.08)', color: network.status === 'Live' ? '#ecfff3' : '#cbd6ff' }}>
