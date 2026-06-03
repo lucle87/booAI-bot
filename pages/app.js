@@ -19,6 +19,7 @@ export default function App() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
+  const pendingTaskRef = useRef(null)
 
   useEffect(() => {
     setMounted(true)
@@ -113,40 +114,47 @@ export default function App() {
         body: JSON.stringify({ messages: newHistory, walletConnected: !!wallet }),
       })
       const data = await res.json()
+      setLoading(false)
 
       if (data.error) {
         addMessage('ai', `❌ ${data.error}`)
-        setLoading(false)
         return
       }
 
       const assistantMsg = { role: 'assistant', content: data.reply }
       setConversationHistory([...newHistory, assistantMsg])
 
-     if (data.ready && data.taskType) {
+      if (data.ready && data.taskType) {
         addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-        setLoading(false)
+        // Use ref to store task data immediately
+        pendingTaskRef.current = data
         setPendingTask(data)
         setShowPayModal(true)
-        return
       } else {
         addMessage('ai', data.reply)
       }
     } catch (err) {
+      setLoading(false)
       addMessage('ai', '❌ Something went wrong. Please try again.')
     }
-    setLoading(false)
   }
 
   const handleExecuteTask = async () => {
-    if (!wallet) { setShowPayModal(false); setShowWalletModal(true); return }
+    const task = pendingTaskRef.current || pendingTask
+    if (!wallet) {
+      setShowPayModal(false)
+      setShowWalletModal(true)
+      return
+    }
     setShowPayModal(false)
     addMessage('ai', '⏳ Processing payment and executing task...')
     setTimeout(() => {
-      const task = pendingTask
       const txHash = '0x' + Math.random().toString(16).substr(2, 40)
       const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
-      addMessage('ai', `✅ Task completed successfully!\n\n**Task:** ${task?.taskName || 'Task'}\n**Contract:** \`${contractAddr}\`\n**Tx Hash:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`, { type: 'success' })
+      addMessage('ai',
+        `✅ Task completed successfully!\n\n**Task:** ${task?.taskName || 'Task'}\n**Contract:** \`${contractAddr}\`\n**Tx Hash:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
+        { type: 'success' }
+      )
       setTaskHistory(prev => [{
         icon: getTaskIcon(task?.taskType),
         name: task?.taskName || 'Task',
@@ -155,16 +163,34 @@ export default function App() {
         time: now(),
       }, ...prev])
       setPendingTask(null)
+      pendingTaskRef.current = null
     }, 2500)
   }
 
+  const handleCancelTask = () => {
+    setShowPayModal(false)
+    setPendingTask(null)
+    pendingTaskRef.current = null
+    addMessage('ai', 'Task cancelled. Let me know if you want to try something else!')
+  }
+
   const getTaskIcon = (type) => {
-    const icons = { DEPLOY_ERC20: '🤖', DEPLOY_NFT: '🖼️', TEXT_TO_IMAGE: '🎨', TEXT_TO_VIDEO: '🎬', IMAGE_TO_VIDEO: '🔄', AUDIT_CONTRACT: '📝', DEPLOY_WEBSITE: '🌐', CREATE_MEMECOIN: '🪙', TEXT_TO_MUSIC: '🎵' }
+    const icons = {
+      DEPLOY_ERC20: '🤖', DEPLOY_NFT: '🖼️', TEXT_TO_IMAGE: '🎨',
+      TEXT_TO_VIDEO: '🎬', IMAGE_TO_VIDEO: '🔄', AUDIT_CONTRACT: '📝',
+      DEPLOY_WEBSITE: '🌐', CREATE_MEMECOIN: '🪙', TEXT_TO_MUSIC: '🎵'
+    }
     return icons[type] || '⚡'
   }
 
-  const chips = ['🤖 Deploy ERC20 Token', '🖼️ Create NFT Collection', '🎬 Text to Video', '📝 Audit My Contract', '🌐 Deploy to IPFS', '🪙 Create a Memecoin', '🎨 Generate NFT Art', '🎵 Generate Music']
+  const chips = [
+    '🤖 Deploy ERC20 Token', '🖼️ Create NFT Collection',
+    '🎬 Text to Video', '📝 Audit My Contract',
+    '🌐 Deploy to IPFS', '🪙 Create a Memecoin',
+    '🎨 Generate NFT Art', '🎵 Generate Music'
+  ]
   const shortAddr = wallet ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : null
+  const taskData = pendingTaskRef.current || pendingTask
 
   return (
     <>
@@ -177,19 +203,17 @@ export default function App() {
 
       <style suppressHydrationWarning>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; overflow: hidden; position: relative; }
+        html, body { height: 100%; overflow: hidden; }
         body { background: #06060f; color: #eeeef5; font-family: 'Inter', sans-serif; }
         h1,h2,h3 { font-family: 'Space Grotesk', sans-serif; }
 
         .app-layout { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
 
-        /* SIDEBAR */
         .sidebar { background: #0a0a14; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; overflow: hidden; }
         .sidebar-top { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .sidebar-logo { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 16px; }
         .sidebar-logo img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
         .sidebar-logo span { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
-
         .wallet-box { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px; }
         .wallet-connected { display: flex; flex-direction: column; gap: 6px; }
         .wallet-addr { font-family: 'Space Mono', monospace; font-size: 12px; color: #00d4aa; font-weight: 500; }
@@ -199,7 +223,6 @@ export default function App() {
         .btn-disconnect:hover { background: rgba(255,100,100,0.08); border-color: rgba(255,100,100,0.5); }
         .btn-connect { width: 100%; background: #8b6fff; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
         .btn-connect:hover { opacity: 0.85; }
-
         .sidebar-section { padding: 16px 20px; flex: 1; overflow-y: auto; }
         .sidebar-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #3a3a52; margin-bottom: 12px; }
         .history-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); }
@@ -209,14 +232,12 @@ export default function App() {
         .history-fee { font-size: 10px; color: #52526a; font-family: 'Space Mono', monospace; }
         .history-status { font-size: 10px; color: #00d4aa; }
         .empty-state { text-align: center; padding: 24px 0; font-size: 12px; color: #3a3a52; font-family: 'Space Mono', monospace; }
-
         .sidebar-bottom { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.06); }
         .faucet-link { font-size: 11px; color: #52526a; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: color 0.2s; font-family: 'Space Mono', monospace; }
         .faucet-link:hover { color: #8b6fff; }
         .back-btn { font-size: 11px; color: #52526a; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; transition: color 0.2s; background: none; border: none; font-family: 'Space Mono', monospace; }
         .back-btn:hover { color: #eeeef5; }
 
-        /* CHAT */
         .chat-panel { display: flex; flex-direction: column; height: 100vh; }
         .chat-topbar { padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
         .chat-topbar-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
@@ -224,11 +245,9 @@ export default function App() {
         .topbar-badge { font-family: 'Space Mono', monospace; font-size: 10px; background: rgba(0,212,170,0.08); color: #00d4aa; border: 1px solid rgba(0,212,170,0.2); padding: 3px 10px; border-radius: 20px; }
         .topbar-fee { font-family: 'Space Mono', monospace; font-size: 10px; color: #52526a; }
         .topbar-addr { font-family: 'Space Mono', monospace; font-size: 11px; color: #00d4aa; background: rgba(0,212,170,0.06); border: 1px solid rgba(0,212,170,0.15); padding: 4px 12px; border-radius: 20px; }
-
         .messages-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
         .messages-area::-webkit-scrollbar { width: 4px; }
         .messages-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
         .msg-row { display: flex; gap: 12px; align-items: flex-start; max-width: 780px; }
         .msg-row.user { flex-direction: row-reverse; margin-left: auto; }
         .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; }
@@ -237,7 +256,6 @@ export default function App() {
         .msg-content { display: flex; flex-direction: column; gap: 4px; }
         .msg-time { font-size: 10px; color: #3a3a52; font-family: 'Space Mono', monospace; }
         .msg-row.user .msg-time { text-align: right; }
-
         .bubble { padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.7; max-width: 600px; white-space: pre-wrap; word-break: break-word; }
         .bubble.ai { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.07); color: #eeeef5; border-radius: 4px 12px 12px 12px; }
         .bubble.user { background: #8b6fff; color: #fff; border-radius: 12px 4px 12px 12px; }
@@ -246,11 +264,9 @@ export default function App() {
         .bubble code { font-family: 'Space Mono', monospace; font-size: 12px; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; }
         .bubble-img { max-width: 200px; max-height: 150px; border-radius: 8px; margin-bottom: 6px; display: block; object-fit: cover; }
         .bubble-file { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 6px; margin-bottom: 6px; }
-
         .chips-area { padding: 0 24px 16px; display: flex; flex-wrap: wrap; gap: 8px; }
         .chip { font-size: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.08); color: #52526a; padding: 6px 14px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; white-space: nowrap; }
         .chip:hover { border-color: #8b6fff; color: #8b6fff; background: rgba(139,111,255,0.08); }
-
         .input-area { padding: 16px 24px 20px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
         .file-preview { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; }
         .file-preview img { height: 48px; width: 48px; object-fit: cover; border-radius: 6px; }
@@ -258,7 +274,6 @@ export default function App() {
         .file-preview-size { font-size: 10px; color: #52526a; font-family: 'Space Mono', monospace; }
         .file-remove { background: none; border: none; color: #52526a; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.2s; }
         .file-remove:hover { color: #ff6b6b; }
-
         .input-box { display: flex; gap: 10px; align-items: flex-end; background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 12px 12px 12px 18px; transition: border-color 0.2s; }
         .input-box:focus-within { border-color: rgba(139,111,255,0.4); }
         .input-box textarea { flex: 1; background: transparent; border: none; outline: none; color: #eeeef5; font-size: 14px; font-family: 'Inter', sans-serif; resize: none; max-height: 120px; line-height: 1.6; }
@@ -269,16 +284,14 @@ export default function App() {
         .send-btn:hover { opacity: 0.85; }
         .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .input-hint { font-size: 10px; color: #3a3a52; font-family: 'Space Mono', monospace; margin-top: 8px; text-align: center; }
-
         .loading-dots { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
         .dot { width: 6px; height: 6px; border-radius: 50%; background: #52526a; animation: bounce 1.2s infinite; }
         .dot:nth-child(2) { animation-delay: 0.2s; }
         .dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
 
-        /* MODALS */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; align-items: center; justify-content: center; }
-        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.88); z-index: 99999; display: flex; align-items: center; justify-content: center; }
+        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; position: relative; }
         .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
         .modal-sub { font-size: 13px; color: #52526a; margin-bottom: 24px; }
         .wallet-option { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; cursor: pointer; margin-bottom: 10px; transition: all 0.2s; }
@@ -289,8 +302,7 @@ export default function App() {
         .wallet-option.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
         .modal-close { width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #52526a; font-size: 13px; cursor: pointer; margin-top: 8px; font-family: 'Inter', sans-serif; transition: all 0.2s; }
         .modal-close:hover { border-color: rgba(255,255,255,0.15); color: #eeeef5; }
-
-        .pay-modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 380px; max-width: 90vw; }
+        .pay-modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 380px; max-width: 90vw; position: relative; }
         .pay-task { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
         .pay-task-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #52526a; margin-bottom: 6px; }
         .pay-task-name { font-size: 15px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
@@ -311,8 +323,6 @@ export default function App() {
       `}</style>
 
       <div className="app-layout">
-
-        {/* SIDEBAR */}
         <div className="sidebar">
           <div className="sidebar-top">
             <div className="sidebar-logo" onClick={() => router.push('/')}>
@@ -324,18 +334,13 @@ export default function App() {
                 <div className="wallet-connected">
                   <div className="wallet-addr">{shortAddr}</div>
                   <div className="wallet-net"><div className="wallet-dot" />ARC Testnet · Connected</div>
-                  <button className="btn-disconnect" onClick={disconnectWallet}>
-                    Disconnect Wallet
-                  </button>
+                  <button className="btn-disconnect" onClick={disconnectWallet}>Disconnect Wallet</button>
                 </div>
               ) : (
-                <button className="btn-connect" onClick={() => setShowWalletModal(true)}>
-                  Connect Wallet →
-                </button>
+                <button className="btn-connect" onClick={() => setShowWalletModal(true)}>Connect Wallet →</button>
               )}
             </div>
           </div>
-
           <div className="sidebar-section">
             <div className="sidebar-label">// TASK HISTORY</div>
             {taskHistory.length === 0 ? (
@@ -353,16 +358,12 @@ export default function App() {
               ))
             )}
           </div>
-
           <div className="sidebar-bottom">
             <button className="back-btn" onClick={() => router.push('/')}>← Back to home</button>
-            <a href="https://faucet.abs.xyz" target="_blank" rel="noreferrer" className="faucet-link">
-              💧 Get testnet USDC
-            </a>
+            <a href="https://faucet.abs.xyz" target="_blank" rel="noreferrer" className="faucet-link">💧 Get testnet USDC</a>
           </div>
         </div>
 
-        {/* CHAT PANEL */}
         <div className="chat-panel">
           <div className="chat-topbar">
             <div className="chat-topbar-title">AI Agent Chat</div>
@@ -371,9 +372,7 @@ export default function App() {
               <span className="topbar-fee">0.1 USDC / task</span>
               {wallet
                 ? <span className="topbar-addr">{shortAddr}</span>
-                : <button className="btn-connect" style={{ padding: '6px 16px', fontSize: 12, width: 'auto' }} onClick={() => setShowWalletModal(true)}>
-                    Connect Wallet
-                  </button>
+                : <button className="btn-connect" style={{ padding: '6px 16px', fontSize: 12, width: 'auto' }} onClick={() => setShowWalletModal(true)}>Connect Wallet</button>
               }
             </div>
           </div>
@@ -498,14 +497,14 @@ export default function App() {
       )}
 
       {/* PAY MODAL */}
-      {showPayModal && pendingTask && (
+      {showPayModal && (
         <div className="modal-overlay">
           <div className="pay-modal">
             <div className="modal-title">Confirm Task</div>
             <div className="modal-sub">Review and approve to execute</div>
             <div className="pay-task">
               <div className="pay-task-label">// TASK</div>
-              <div className="pay-task-name">{pendingTask.taskName || 'Smart Contract Task'}</div>
+              <div className="pay-task-name">{taskData?.taskName || 'Smart Contract Task'}</div>
             </div>
             <div className="pay-amount">
               <div className="pay-amount-label">Fee</div>
@@ -517,7 +516,7 @@ export default function App() {
               </div>
             )}
             <div className="pay-btns">
-              <button className="btn-cancel" onClick={() => { setShowPayModal(false); addMessage('ai', 'Task cancelled. Let me know if you want to try something else!') }}>Cancel</button>
+              <button className="btn-cancel" onClick={handleCancelTask}>Cancel</button>
               <button className="btn-pay" onClick={handleExecuteTask}>
                 {wallet ? 'Pay & Execute →' : 'Connect Wallet First'}
               </button>
