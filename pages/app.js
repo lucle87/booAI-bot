@@ -129,9 +129,9 @@ export default function App() {
       setConversationHistory([...newHistory, assistantMsg])
 
       if (data.ready && data.taskType) {
-        setPendingTask(data)
-        addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-        setShowPayModal(true)
+  setPendingTask(data)
+  addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
+  setTimeout(() => setShowPayModal(true), 300)
       } else {
         addMessage('ai', data.reply)
       }
@@ -281,7 +281,7 @@ export default function App() {
         @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
 
         /* MODALS */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; }
         .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
         .modal-sub { font-size: 13px; color: #52526a; margin-bottom: 24px; }
