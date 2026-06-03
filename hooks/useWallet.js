@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 const ARC_TESTNET = {
-  chainId: '0x4CDEF2',        // 5042002 decimal
+  chainId: '0x4D0112',        // 5042002 decimal
   chainIdDecimal: 5042002,
   chainName: 'ARC Testnet',
   nativeCurrency: {

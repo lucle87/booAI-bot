@@ -40,7 +40,7 @@ export default function App() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 const ARC_CHAIN = {
-  chainId: '0x4CDEF2',
+  chainId: '0x4cef52',
   chainName: 'ARC Testnet',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: ['https://rpc.testnet.arc.network'],
