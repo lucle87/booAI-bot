@@ -2,30 +2,31 @@
 import { useState, useEffect, useCallback } from 'react'
 
 const ARC_TESTNET = {
-  chainId: '0x2B74',           // 11124 in hex
-  chainIdDecimal: 11124,
+  chainId: '0x4CDEF2',        // 5042002 decimal
+  chainIdDecimal: 5042002,
   chainName: 'ARC Testnet',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://api.testnet.abs.xyz'],
-  blockExplorerUrls: ['https://explorer.testnet.abs.xyz'],
+  nativeCurrency: {
+    name: 'USDC',
+    symbol: 'USDC',
+    decimals: 6,
+  },
+  rpcUrls: ['https://rpc.testnet.arc.network'],
+  blockExplorerUrls: ['https://testnet.arcscan.app'],
 }
 
 export function useWallet() {
   const [address, setAddress] = useState(null)
   const [chainId, setChainId] = useState(null)
-  const [balance, setBalance] = useState(null)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState(null)
-  const [walletType, setWalletType] = useState(null) // 'metamask' | 'okx'
+  const [walletType, setWalletType] = useState(null)
 
-  // Auto-reconnect on page load
   useEffect(() => {
     if (typeof window === 'undefined') return
     const saved = localStorage.getItem('booai_wallet_type')
     if (saved) autoReconnect(saved)
 
-    // Listen for account changes
-    const provider = getProvider(saved || 'metamask')
+    const provider = saved === 'okx' ? window.okxwallet : window.ethereum
     if (!provider) return
 
     const onAccountsChanged = (accounts) => {
@@ -42,15 +43,8 @@ export function useWallet() {
     }
   }, [])
 
-  const getProvider = (type = 'metamask') => {
-    if (typeof window === 'undefined') return null
-    if (type === 'okx') return window.okxwallet || null
-    if (type === 'metamask') return window.ethereum?.isMetaMask ? window.ethereum : window.ethereum || null
-    return window.ethereum || window.okxwallet || null
-  }
-
   const autoReconnect = async (type) => {
-    const provider = getProvider(type)
+    const provider = type === 'okx' ? window.okxwallet : window.ethereum
     if (!provider) return
     try {
       const accounts = await provider.request({ method: 'eth_accounts' })
@@ -59,7 +53,6 @@ export function useWallet() {
         setWalletType(type)
         const chain = await provider.request({ method: 'eth_chainId' })
         setChainId(chain)
-        fetchBalance(accounts[0], provider)
       }
     } catch { /* silent */ }
   }
@@ -71,7 +64,6 @@ export function useWallet() {
         params: [{ chainId: ARC_TESTNET.chainId }],
       })
     } catch (switchErr) {
-      // Chain not added yet — add it
       if (switchErr.code === 4902) {
         await provider.request({
           method: 'wallet_addEthereumChain',
@@ -83,24 +75,10 @@ export function useWallet() {
     }
   }
 
-  const fetchBalance = async (addr, provider) => {
-    try {
-      const hex = await provider.request({
-        method: 'eth_getBalance',
-        params: [addr, 'latest'],
-      })
-      const eth = parseInt(hex, 16) / 1e18
-      setBalance(eth.toFixed(4) + ' ETH')
-    } catch {
-      setBalance(null)
-    }
-  }
-
   const connect = useCallback(async (type = 'metamask') => {
     setConnecting(true)
     setError(null)
 
-    // Check if wallet is installed
     if (type === 'okx' && !window.okxwallet) {
       window.open('https://www.okx.com/web3', '_blank')
       setConnecting(false)
@@ -112,37 +90,24 @@ export function useWallet() {
       return null
     }
 
-    const provider = getProvider(type)
-    if (!provider) {
-      setError('Wallet not found')
-      setConnecting(false)
-      return null
-    }
+    const provider = type === 'okx' ? window.okxwallet : window.ethereum
 
     try {
-      // Request accounts
       const accounts = await provider.request({ method: 'eth_requestAccounts' })
       const addr = accounts[0]
 
       // Switch to ARC Testnet
       await switchToArcTestnet(provider)
 
-      // Get chain
       const chain = await provider.request({ method: 'eth_chainId' })
-
       setAddress(addr)
       setChainId(chain)
       setWalletType(type)
       localStorage.setItem('booai_wallet_type', type)
-
-      // Fetch ETH balance
-      await fetchBalance(addr, provider)
-
       setConnecting(false)
       return addr
     } catch (err) {
-      const msg = err.message || 'Connection failed'
-      setError(msg)
+      setError(err.message || 'Connection failed')
       setConnecting(false)
       return null
     }
@@ -151,23 +116,18 @@ export function useWallet() {
   const disconnect = useCallback(() => {
     setAddress(null)
     setChainId(null)
-    setBalance(null)
     setWalletType(null)
     setError(null)
     localStorage.removeItem('booai_wallet_type')
   }, [])
 
-  const isOnArcTestnet = chainId === ARC_TESTNET.chainId
-
-  const shortAddress = address
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : null
+  const isOnArcTestnet = chainId?.toLowerCase() === ARC_TESTNET.chainId.toLowerCase()
+  const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null
 
   return {
     address,
     shortAddress,
     chainId,
-    balance,
     connecting,
     error,
     walletType,
