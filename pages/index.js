@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 const networks = [
   { id: 'ethereum', icon: '⟠', name: 'Ethereum', status: 'Soon' },
@@ -12,16 +13,14 @@ const networks = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   return (
     <main>
       <header className="header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/logo.png" alt="logo" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+          <img src="/logo.png" alt="logo" style={{ width: 64, height: 64, objectFit: 'contain' }} />
           <div className="brand" style={{ fontSize: '50%' }}>booAI_bot</div>
         </div>
-        <nav>
-          <Link href="/picker" className="button-secondary">Choose style</Link>
-        </nav>
       </header>
 
       <section>
@@ -31,8 +30,8 @@ export default function Home() {
             <p className="subtitle">
               Create, review, and deploy Solidity contracts with MetaMask and USDC.
             </p>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.8rem' }}>
-              <Link href="/picker" className="button">Get started</Link>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.8rem' }}>
+              <button className="button" onClick={() => router.push('/app/dark')}>Get started</button>
               <Link href="/app/dark" className="button-secondary">Dark Cyber demo</Link>
             </div>
           </div>
