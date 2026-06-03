@@ -96,11 +96,14 @@ WHEN ALL INFO IS COLLECTED respond ONLY with this JSON (no markdown, no extra te
 
     const data = await response.json()
     const rawText = data.choices?.[0]?.message?.content || ''
+    console.log('=== GROQ RAW TEXT ===', rawText.substring(0, 500))
 
     // Try to parse as JSON (task ready response)
     let parsed = null
     try {
-      const jsonMatch = rawText.match(/\{[\s\S]*"ready"\s*:\s*true[\s\S]*\}/)
+      // Strip markdown code blocks first
+const stripped = rawText.replace(/```json|```/g, '').trim()
+const jsonMatch = stripped.match(/\{[\s\S]*"ready"\s*:\s*true[\s\S]*\}/)
       if (jsonMatch) {
         parsed = JSON.parse(jsonMatch[0])
       }
