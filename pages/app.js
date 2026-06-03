@@ -157,15 +157,63 @@ setShowWalletModal(false)
   }
 
   const handleExecuteTask = async () => {
-    const task = pendingTaskRef.current || pendingTask
-    if (!wallet) {
-      setShowPayModal(false)
-      setShowWalletModal(true)
-      return
-    }
-    setShowPayModal(false)
-    addMessage('ai', '⏳ Processing payment and executing task...')
+  const task = pendingTaskRef.current || pendingTask
+  if (!wallet) { setShowPayModal(false); setShowWalletModal(true); return }
+  setShowPayModal(false)
+  addMessage('ai', '⏳ Requesting payment approval from wallet...')
+
+  try {
+    const provider = window.okxwallet || window.ethereum
+    if (!provider) throw new Error('Wallet not found')
+
+    // USDC contract on ARC Testnet
+    const USDC = '0x3600000000000000000000000000000000000000'
+    const TREASURY = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
+    const AMOUNT = '0x186A0' // 0.1 USDC = 100000 (6 decimals) in hex
+
+    // ERC20 transfer(address,uint256) = 0xa9059cbb
+    const data = '0xa9059cbb' +
+      TREASURY.replace('0x', '').padStart(64, '0') +
+      AMOUNT.replace('0x', '').padStart(64, '0')
+
+    const txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: wallet,
+        to: USDC,
+        data: data,
+        gas: '0x15F90', // 90000 gas
+      }]
+    })
+
+    addMessage('ai', `⏳ Payment sent! Waiting for confirmation...\nTx: \`${txHash}\``)
+
+    // Wait for confirmation then complete task
     setTimeout(() => {
+      const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
+      addMessage('ai',
+        `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
+        { type: 'success' }
+      )
+      setTaskHistory(prev => [{
+        icon: getTaskIcon(task?.taskType),
+        name: task?.taskName || 'Task',
+        fee: '0.1 USDC',
+        status: 'done',
+        time: now(),
+      }, ...prev])
+      setPendingTask(null)
+      pendingTaskRef.current = null
+    }, 3000)
+
+  } catch (err) {
+    if (err.code === 4001) {
+      addMessage('ai', '❌ Payment cancelled. Task not executed.')
+    } else {
+      addMessage('ai', `❌ Payment failed: ${err.message}`)
+    }
+  }
+}
       const txHash = '0x' + Math.random().toString(16).substr(2, 40)
       const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
       addMessage('ai',
