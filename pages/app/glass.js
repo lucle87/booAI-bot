@@ -133,7 +133,7 @@ export default function GlassApp() {
     >
       <header className="header">
         <div>
-          <div className="brand">booAI_bot</div>
+          <div className="brand" style={{ fontSize: '1.5rem' }}>booAI_bot</div>
           {selectedChain && <p style={{ margin: '0.5rem 0 0', color: '#d9e9ff' }}>Selected network: {selectedChain.name}</p>}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>

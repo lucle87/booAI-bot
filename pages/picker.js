@@ -4,7 +4,7 @@ export default function Picker() {
   return (
     <main>
       <header className="header">
-        <div className="brand">booAI_bot</div>
+        <div className="brand" style={{ fontSize: '1.5rem' }}>booAI_bot</div>
         <Link href="/" className="button-secondary">Home</Link>
       </header>
 

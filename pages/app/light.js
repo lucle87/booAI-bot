@@ -128,7 +128,7 @@ export default function LightApp() {
     <main style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #eff7ff 0%, #d9e9ff 100%)', color: '#122b55' }}>
       <header className="header">
         <div>
-          <div className="brand" style={{ color: '#122b55' }}>booAI_bot</div>
+          <div className="brand" style={{ fontSize: '1.5rem', color: '#122b55' }}>booAI_bot</div>
           {selectedChain && <p style={{ margin: '0.5rem 0 0', color: '#5d76a6' }}>Selected network: {selectedChain.name}</p>}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>

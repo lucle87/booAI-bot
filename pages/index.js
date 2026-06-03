@@ -18,8 +18,8 @@ export default function Home() {
     <main>
       <header className="header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/logo.png" alt="logo" style={{ width: 64, height: 64, objectFit: 'contain' }} />
-          <div className="brand" style={{ fontSize: '50%' }}>booAI_bot</div>
+          <img src="/logo.png" alt="logo" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+          <div className="brand" style={{ fontSize: '75%' }}>booAI_bot</div>
         </div>
       </header>
 

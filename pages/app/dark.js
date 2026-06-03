@@ -127,7 +127,7 @@ export default function DarkApp() {
     <main style={{ minHeight: '100vh', background: 'radial-gradient(circle at top, rgba(162, 76, 255, 0.16), transparent 28%), linear-gradient(180deg, #09070d 0%, #040205 100%)', color: '#f6f6ff' }}>
       <header className="header">
         <div>
-          <div className="brand">booAI_bot</div>
+          <div className="brand" style={{ fontSize: '1.5rem' }}>booAI_bot</div>
           {selectedChain && <p style={{ margin: '0.5rem 0 0', color: '#b8c0e4' }}>Selected network: {selectedChain.name}</p>}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
