@@ -21,11 +21,22 @@ export default function App() {
   const fileInputRef = useRef(null)
   const pendingTaskRef = useRef(null)
 
+  const ARC_CHAIN = {
+    chainId: '0x4cef52',
+    chainName: 'ARC Testnet',
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+    rpcUrls: ['https://rpc.testnet.arc.network'],
+    blockExplorerUrls: ['https://testnet.arcscan.app'],
+  }
+
+  const USDC_ADDRESS = '0x3600000000000000000000000000000000000000'
+  const TREASURY = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
+
   useEffect(() => {
     setMounted(true)
     setMessages([{
       role: 'ai',
-      content: "👋 Hi! I'm booAI_bot — your AI agent on ARC Testnet.\n\nI can deploy smart contracts, generate images & videos, mint NFT collections, audit Solidity code, and much more.\n\nEach task costs **0.1 USDC**. Connect your wallet to get started — or just chat with me first!",
+      content: "👋 Hi! I'm booAI_bot — your AI agent on ARC Testnet.\n\nI can deploy smart contracts, generate images & videos, mint NFT collections, audit Solidity code, and much more.\n\nEach task costs **0.1 USDC**. Connect your wallet to get started!",
       time: now(),
     }])
   }, [])
@@ -39,23 +50,23 @@ export default function App() {
   function now() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
-const ARC_CHAIN = {
-  chainId: '0x4cef52',
-  chainName: 'ARC Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  rpcUrls: ['https://rpc.testnet.arc.network'],
-  blockExplorerUrls: ['https://testnet.arcscan.app'],
-}
 
-const switchToARC = async (provider) => {
-  try {
-    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x4CDEF2' }] })
-  } catch (err) {
-    if (err.code === 4902) {
-      await provider.request({ method: 'wallet_addEthereumChain', params: [ARC_CHAIN] })
-    } else throw err
+  const switchToARC = async (provider) => {
+    try {
+      await provider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: ARC_CHAIN.chainId }],
+      })
+    } catch (err) {
+      if (err.code === 4902) {
+        await provider.request({
+          method: 'wallet_addEthereumChain',
+          params: [ARC_CHAIN],
+        })
+      } else throw err
+    }
   }
-}
+
   const connectWallet = async (type) => {
     let provider = null
     if (type === 'okx') {
@@ -67,10 +78,10 @@ const switchToARC = async (provider) => {
     }
     try {
       const accounts = await provider.request({ method: 'eth_requestAccounts' })
-const addr = accounts[0]
-await switchToARC(provider)
-setWallet(addr)
-setShowWalletModal(false)
+      const addr = accounts[0]
+      await switchToARC(provider)
+      setWallet(addr)
+      setShowWalletModal(false)
       addMessage('ai', `✅ Wallet connected: \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n\n🔗 Switched to **ARC Testnet** (Chain ID: 5042002)\n\nWhat would you like to build today?`)
     } catch (err) {
       addMessage('ai', `❌ Connection failed: ${err.message}`)
@@ -143,7 +154,6 @@ setShowWalletModal(false)
 
       if (data.ready && data.taskType) {
         addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-        // Use ref to store task data immediately
         pendingTaskRef.current = data
         setPendingTask(data)
         setShowPayModal(true)
@@ -157,79 +167,65 @@ setShowWalletModal(false)
   }
 
   const handleExecuteTask = async () => {
-  const task = pendingTaskRef.current || pendingTask
-  if (!wallet) { setShowPayModal(false); setShowWalletModal(true); return }
-  setShowPayModal(false)
-  addMessage('ai', '⏳ Requesting payment approval from wallet...')
-
-  try {
-    const provider = window.okxwallet || window.ethereum
-    if (!provider) throw new Error('Wallet not found')
-
-    // USDC contract on ARC Testnet
-    const USDC = '0x3600000000000000000000000000000000000000'
-    const TREASURY = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
-    const AMOUNT = '0x186A0' // 0.1 USDC = 100000 (6 decimals) in hex
-
-    // ERC20 transfer(address,uint256) = 0xa9059cbb
-    const data = '0xa9059cbb' +
-      TREASURY.replace('0x', '').padStart(64, '0') +
-      AMOUNT.replace('0x', '').padStart(64, '0')
-
-    const txHash = await provider.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: wallet,
-        to: USDC,
-        data: data,
-        gas: '0x15F90', // 90000 gas
-      }]
-    })
-
-    addMessage('ai', `⏳ Payment sent! Waiting for confirmation...\nTx: \`${txHash}\``)
-
-    // Wait for confirmation then complete task
-    setTimeout(() => {
-      const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
-      addMessage('ai',
-        `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
-        { type: 'success' }
-      )
-      setTaskHistory(prev => [{
-        icon: getTaskIcon(task?.taskType),
-        name: task?.taskName || 'Task',
-        fee: '0.1 USDC',
-        status: 'done',
-        time: now(),
-      }, ...prev])
-      setPendingTask(null)
-      pendingTaskRef.current = null
-    }, 3000)
-
-  } catch (err) {
-    if (err.code === 4001) {
-      addMessage('ai', '❌ Payment cancelled. Task not executed.')
-    } else {
-      addMessage('ai', `❌ Payment failed: ${err.message}`)
+    const task = pendingTaskRef.current || pendingTask
+    if (!wallet) {
+      setShowPayModal(false)
+      setShowWalletModal(true)
+      return
     }
-  }
-}
-      const txHash = '0x' + Math.random().toString(16).substr(2, 40)
-      const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
-      addMessage('ai',
-        `✅ Task completed successfully!\n\n**Task:** ${task?.taskName || 'Task'}\n**Contract:** \`${contractAddr}\`\n**Tx Hash:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
-        { type: 'success' }
-      )
-      setTaskHistory(prev => [{
-        icon: getTaskIcon(task?.taskType),
-        name: task?.taskName || 'Task',
-        fee: '0.1 USDC',
-        status: 'done',
-        time: now(),
-      }, ...prev])
-      setPendingTask(null)
-      pendingTaskRef.current = null
-    }, 2500)
+    setShowPayModal(false)
+
+    try {
+      const provider = window.okxwallet || window.ethereum
+      if (!provider) throw new Error('Wallet not found')
+
+      addMessage('ai', '⏳ Please approve the 0.1 USDC payment in your wallet...')
+
+      // 0.1 USDC = 100000 (6 decimals ERC20 interface)
+      const amount = BigInt(100000)
+      const amountHex = '0x' + amount.toString(16)
+
+      // ERC20 transfer(address to, uint256 amount)
+      const transferData = '0xa9059cbb' +
+        TREASURY.replace('0x', '').padStart(64, '0') +
+        amount.toString(16).padStart(64, '0')
+
+      const txHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: wallet,
+          to: USDC_ADDRESS,
+          data: transferData,
+          gas: '0x15F90',
+        }]
+      })
+
+      addMessage('ai', `⏳ Payment confirmed! Executing task...\n💳 Tx: \`${txHash.slice(0,20)}...\``)
+
+      setTimeout(() => {
+        const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
+        addMessage('ai',
+          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/${txHash}`,
+          { type: 'success' }
+        )
+        setTaskHistory(prev => [{
+          icon: getTaskIcon(task?.taskType),
+          name: task?.taskName || 'Task',
+          fee: '0.1 USDC',
+          status: 'done',
+          time: now(),
+        }, ...prev])
+        setPendingTask(null)
+        pendingTaskRef.current = null
+      }, 3000)
+
+    } catch (err) {
+      if (err.code === 4001 || err.message?.includes('rejected')) {
+        addMessage('ai', '❌ Payment rejected. Task cancelled.')
+      } else {
+        addMessage('ai', `❌ Payment failed: ${err.message}`)
+      }
+    }
   }
 
   const handleCancelTask = () => {
@@ -240,20 +236,11 @@ setShowWalletModal(false)
   }
 
   const getTaskIcon = (type) => {
-    const icons = {
-      DEPLOY_ERC20: '🤖', DEPLOY_NFT: '🖼️', TEXT_TO_IMAGE: '🎨',
-      TEXT_TO_VIDEO: '🎬', IMAGE_TO_VIDEO: '🔄', AUDIT_CONTRACT: '📝',
-      DEPLOY_WEBSITE: '🌐', CREATE_MEMECOIN: '🪙', TEXT_TO_MUSIC: '🎵'
-    }
+    const icons = { DEPLOY_ERC20: '🤖', DEPLOY_NFT: '🖼️', TEXT_TO_IMAGE: '🎨', TEXT_TO_VIDEO: '🎬', IMAGE_TO_VIDEO: '🔄', AUDIT_CONTRACT: '📝', DEPLOY_WEBSITE: '🌐', CREATE_MEMECOIN: '🪙', TEXT_TO_MUSIC: '🎵' }
     return icons[type] || '⚡'
   }
 
-  const chips = [
-    '🤖 Deploy ERC20 Token', '🖼️ Create NFT Collection',
-    '🎬 Text to Video', '📝 Audit My Contract',
-    '🌐 Deploy to IPFS', '🪙 Create a Memecoin',
-    '🎨 Generate NFT Art', '🎵 Generate Music'
-  ]
+  const chips = ['🤖 Deploy ERC20 Token', '🖼️ Create NFT Collection', '🎬 Text to Video', '📝 Audit My Contract', '🌐 Deploy to IPFS', '🪙 Create a Memecoin', '🎨 Generate NFT Art', '🎵 Generate Music']
   const shortAddr = wallet ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : null
   const taskData = pendingTaskRef.current || pendingTask
 
@@ -271,9 +258,7 @@ setShowWalletModal(false)
         html, body { height: 100%; overflow: hidden; }
         body { background: #06060f; color: #eeeef5; font-family: 'Inter', sans-serif; }
         h1,h2,h3 { font-family: 'Space Grotesk', sans-serif; }
-
         .app-layout { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
-
         .sidebar { background: #0a0a14; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; overflow: hidden; }
         .sidebar-top { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .sidebar-logo { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 16px; }
@@ -302,7 +287,6 @@ setShowWalletModal(false)
         .faucet-link:hover { color: #8b6fff; }
         .back-btn { font-size: 11px; color: #52526a; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; transition: color 0.2s; background: none; border: none; font-family: 'Space Mono', monospace; }
         .back-btn:hover { color: #eeeef5; }
-
         .chat-panel { display: flex; flex-direction: column; height: 100vh; }
         .chat-topbar { padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
         .chat-topbar-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
@@ -354,9 +338,8 @@ setShowWalletModal(false)
         .dot:nth-child(2) { animation-delay: 0.2s; }
         .dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
-
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.88); z-index: 99999; display: flex; align-items: center; justify-content: center; }
-        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; position: relative; }
+        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; }
         .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
         .modal-sub { font-size: 13px; color: #52526a; margin-bottom: 24px; }
         .wallet-option { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; cursor: pointer; margin-bottom: 10px; transition: all 0.2s; }
@@ -365,9 +348,8 @@ setShowWalletModal(false)
         .wallet-option-name { font-size: 14px; font-weight: 500; }
         .wallet-option-desc { font-size: 11px; color: #52526a; margin-top: 2px; }
         .wallet-option.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-        .modal-close { width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #52526a; font-size: 13px; cursor: pointer; margin-top: 8px; font-family: 'Inter', sans-serif; transition: all 0.2s; }
-        .modal-close:hover { border-color: rgba(255,255,255,0.15); color: #eeeef5; }
-        .pay-modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 380px; max-width: 90vw; position: relative; }
+        .modal-close { width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #52526a; font-size: 13px; cursor: pointer; margin-top: 8px; font-family: 'Inter', sans-serif; }
+        .pay-modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 380px; max-width: 90vw; }
         .pay-task { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
         .pay-task-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #52526a; margin-bottom: 6px; }
         .pay-task-name { font-size: 15px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
@@ -380,11 +362,7 @@ setShowWalletModal(false)
         .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #52526a; font-size: 14px; cursor: pointer; font-family: 'Inter', sans-serif; }
         .btn-pay { flex: 2; padding: 12px; background: #8b6fff; border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
         .btn-pay:hover { opacity: 0.85; }
-
-        @media (max-width: 768px) {
-          .app-layout { grid-template-columns: 1fr; }
-          .sidebar { display: none; }
-        }
+        @media (max-width: 768px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
       `}</style>
 
       <div className="app-layout">
@@ -425,7 +403,7 @@ setShowWalletModal(false)
           </div>
           <div className="sidebar-bottom">
             <button className="back-btn" onClick={() => router.push('/')}>← Back to home</button>
-            <a href="https://faucet.abs.xyz" target="_blank" rel="noreferrer" className="faucet-link">💧 Get testnet USDC</a>
+            <a href="https://faucet.circle.com" target="_blank" rel="noreferrer" className="faucet-link">💧 Get testnet USDC</a>
           </div>
         </div>
 
@@ -529,7 +507,6 @@ setShowWalletModal(false)
         </div>
       </div>
 
-      {/* WALLET MODAL */}
       {showWalletModal && (
         <div className="modal-overlay" onClick={() => setShowWalletModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -537,36 +514,26 @@ setShowWalletModal(false)
             <div className="modal-sub">Choose your wallet to connect to ARC Testnet</div>
             <div className="wallet-option" onClick={() => connectWallet('metamask')}>
               <div className="wallet-option-icon">🦊</div>
-              <div>
-                <div className="wallet-option-name">MetaMask</div>
-                <div className="wallet-option-desc">Browser Extension</div>
-              </div>
+              <div><div className="wallet-option-name">MetaMask</div><div className="wallet-option-desc">Browser Extension</div></div>
             </div>
             <div className="wallet-option" onClick={() => connectWallet('okx')}>
               <div className="wallet-option-icon">⬡</div>
-              <div>
-                <div className="wallet-option-name">OKX Wallet</div>
-                <div className="wallet-option-desc">OKX Browser Extension</div>
-              </div>
+              <div><div className="wallet-option-name">OKX Wallet</div><div className="wallet-option-desc">OKX Browser Extension</div></div>
             </div>
             <div className="wallet-option disabled">
               <div className="wallet-option-icon">📧</div>
-              <div>
-                <div className="wallet-option-name">Email Login</div>
-                <div className="wallet-option-desc">Coming Soon</div>
-              </div>
+              <div><div className="wallet-option-name">Email Login</div><div className="wallet-option-desc">Coming Soon</div></div>
             </div>
             <button className="modal-close" onClick={() => setShowWalletModal(false)}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* PAY MODAL */}
       {showPayModal && (
         <div className="modal-overlay">
           <div className="pay-modal">
-            <div className="modal-title">Confirm Task</div>
-            <div className="modal-sub">Review and approve to execute</div>
+            <div className="modal-title">Confirm Payment</div>
+            <div className="modal-sub">Your wallet will ask you to sign the transaction</div>
             <div className="pay-task">
               <div className="pay-task-label">// TASK</div>
               <div className="pay-task-name">{taskData?.taskName || 'Smart Contract Task'}</div>
@@ -577,13 +544,13 @@ setShowWalletModal(false)
             </div>
             {wallet && (
               <div className="pay-wallet">
-                Wallet: <span>{shortAddr}</span> · ARC Testnet
+                From: <span>{shortAddr}</span> → ARC Testnet
               </div>
             )}
             <div className="pay-btns">
               <button className="btn-cancel" onClick={handleCancelTask}>Cancel</button>
               <button className="btn-pay" onClick={handleExecuteTask}>
-                {wallet ? 'Pay & Execute →' : 'Connect Wallet First'}
+                {wallet ? '💳 Pay & Execute →' : 'Connect Wallet First'}
               </button>
             </div>
           </div>
