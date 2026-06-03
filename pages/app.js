@@ -123,10 +123,12 @@ export default function App() {
       const assistantMsg = { role: 'assistant', content: data.reply }
       setConversationHistory([...newHistory, assistantMsg])
 
-      if (data.ready && data.taskType) {
-  addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-  setPendingTask(data)
-  setShowPayModal(true)
+     if (data.ready && data.taskType) {
+        addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
+        setLoading(false)
+        setPendingTask(data)
+        setShowPayModal(true)
+        return
       } else {
         addMessage('ai', data.reply)
       }
