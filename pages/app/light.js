@@ -21,7 +21,7 @@ const networkOptions = [
 ];
 
 export default function LightApp() {
-  const { account, chainId, error, connectMetaMask, switchToAbstract } = useWallet();
+  const { account, chainId, error, connectMetaMask, connectOkxWallet, connectWalletConnect, switchToAbstract } = useWallet();
   const { deploying, contractAddress, deployError, deployContract } = useDeploy();
   const [selectedTab, setSelectedTab] = useState('solidity');
   const [selectedChainKey, setSelectedChainKey] = useState(null);
@@ -36,6 +36,7 @@ export default function LightApp() {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
@@ -45,6 +46,43 @@ export default function LightApp() {
     if (id === '0x2b14') return 'ARC Testnet';
     return id;
   };
+  const shortenAddress = (address) => address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'not connected';
+  const walletOptions = [
+    {
+      id: 'metamask',
+      icon: '🦊',
+      title: 'MetaMask',
+      description: 'Browser Extension',
+      onClick: async () => { await connectMetaMask(); setWalletModalOpen(false); },
+      disabled: false,
+    },
+    {
+      id: 'okx',
+      icon: 'OKX',
+      title: 'OKX Wallet',
+      description: 'OKX Browser Extension',
+      onClick: async () => { await connectOkxWallet(); setWalletModalOpen(false); },
+      disabled: false,
+    },
+    {
+      id: 'walletconnect',
+      icon: '🔗',
+      title: 'WalletConnect',
+      description: 'Mobile & Multi-wallet',
+      onClick: () => { connectWalletConnect(); setWalletModalOpen(false); },
+      disabled: false,
+    },
+    {
+      id: 'email',
+      icon: '📧',
+      title: 'Email / Social Login',
+      description: 'Sign in with Email (Coming Soon)',
+      onClick: null,
+      disabled: true,
+    },
+  ];
+  const openWalletModal = () => setWalletModalOpen(true);
+  const closeWalletModal = () => setWalletModalOpen(false);
   const contractReady = selectedTab === 'solidity'
     ? solidity.trim().length > 0 && solidity.trim() !== initialSolidity.trim()
     : abi.trim().length > 0 && bytecode.trim().length > 0 && (abi.trim() !== initialAbi.trim() || bytecode.trim() !== initialBytecode.trim());
@@ -193,10 +231,10 @@ export default function LightApp() {
 
         {selectedChain && (
           <div className="card card-light" style={{ marginTop: '1.5rem' }}>
-            <p className="tag">Account: {account || 'not connected'}</p>
+            <p className="tag">Account: {shortenAddress(account)}</p>
             <p className="tag">Network: {getNetworkLabel(chainId)}{isSelectedChainConnected ? ` (${selectedChain.name})` : ''}</p>
             {!account && isSelectedChainLive && (
-              <button className="button" style={{ width: '100%' }} onClick={connectMetaMask}>Connect Wallet →</button>
+              <button className="button" style={{ width: '100%' }} onClick={openWalletModal}>Connect Wallet →</button>
             )}
             {account && !isSelectedChainConnected && selectedChainKey === 'abstractTestnet' && (
               <button className="button-secondary" style={{ width: '100%' }} onClick={switchToAbstract}>Switch to {selectedChain.name}</button>
@@ -215,6 +253,54 @@ export default function LightApp() {
                 <p style={{ color: '#c62828', marginTop: '1rem' }}>{error}</p>
               )
             )}
+          </div>
+        )}
+
+        {walletModalOpen && (
+          <div className="wallet-modal-overlay" onClick={closeWalletModal}>
+            <div className="wallet-modal" onClick={(event) => event.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: '#061431' }}>Connect Wallet</h2>
+                  <p style={{ margin: '0.4rem 0 0', color: '#5b6b8f' }}>Choose a wallet to connect.</p>
+                </div>
+                <button onClick={closeWalletModal} style={{ background: 'transparent', border: 'none', color: '#061431', fontSize: '1.8rem', cursor: 'pointer' }}>×</button>
+              </div>
+              {walletOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="wallet-modal-row"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '1rem',
+                    marginBottom: '0.8rem',
+                    background: option.disabled ? 'rgba(17, 31, 70, 0.7)' : '#f8fbff',
+                    border: option.disabled ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(155,127,255,0.3)',
+                    borderRadius: '14px',
+                    color: '#061431',
+                    cursor: option.disabled ? 'not-allowed' : 'pointer',
+                    opacity: option.disabled ? 0.5 : 1,
+                    pointerEvents: option.disabled ? 'none' : 'auto',
+                    textAlign: 'left',
+                  }}
+                  onClick={option.onClick}
+                  disabled={option.disabled}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span style={{ fontSize: '1.6rem' }}>{option.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#061431' }}>{option.title}</div>
+                      <div style={{ color: '#5b6b8f', fontSize: '0.95rem', marginTop: '0.25rem' }}>{option.description}</div>
+                    </div>
+                  </div>
+                  {option.disabled && <span style={{ fontSize: '0.85rem', color: '#7a84a0' }}>Coming Soon</span>}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </section>
@@ -337,6 +423,33 @@ export default function LightApp() {
           </div>
         </section>
       )}
+      <style jsx>{`
+        .wallet-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1.5rem;
+        }
+        .wallet-modal {
+          width: min(580px, 100%);
+          background: #0e0e1a;
+          border: 1px solid rgba(155, 127, 255, 0.3);
+          border-radius: 16px;
+          padding: 32px;
+          box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+        }
+        .wallet-modal-row {
+          transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .wallet-modal-row:hover {
+          box-shadow: 0 0 0 1px rgba(155, 127, 255, 0.35), 0 18px 45px rgba(125, 90, 255, 0.16);
+          transform: translateY(-1px);
+        }
+      `}</style>
     </main>
   );
 }

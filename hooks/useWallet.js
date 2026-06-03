@@ -4,15 +4,23 @@ import { CHAINS } from '../lib/config';
 const INSTALL_MESSAGE = 'Please install MetaMask to continue → metamask.io';
 const INSTALL_URL = 'https://metamask.io/download/';
 
-function getEthereumProvider() {
-  if (typeof window === 'undefined' || !window.ethereum) return null;
-  const ethereum = window.ethereum;
+function getWalletProvider(preferred) {
+  if (typeof window === 'undefined') return null;
+  const { ethereum, okxwallet } = window;
 
-  if (ethereum.providers && Array.isArray(ethereum.providers)) {
-    return ethereum.providers.find((provider) => typeof provider.request === 'function') || ethereum.providers[0] || ethereum;
+  if (preferred === 'metamask') {
+    if (ethereum?.isMetaMask) return ethereum;
+    return ethereum || okxwallet || null;
   }
 
-  return ethereum;
+  if (preferred === 'okx') {
+    if (okxwallet) return okxwallet;
+    return ethereum || null;
+  }
+
+  if (ethereum?.isMetaMask) return ethereum;
+  if (okxwallet) return okxwallet;
+  return ethereum || null;
 }
 
 export function useWallet() {
@@ -21,7 +29,7 @@ export function useWallet() {
   const [error, setError] = useState(null);
 
   const refreshState = async () => {
-    const provider = getEthereumProvider();
+    const provider = getWalletProvider();
     if (!provider) {
       setAccount(null);
       setChainId(null);
@@ -41,7 +49,7 @@ export function useWallet() {
   };
 
   const connectMetaMask = async () => {
-    const provider = getEthereumProvider();
+    const provider = getWalletProvider('metamask');
     if (!provider) {
       setError(INSTALL_MESSAGE);
       if (typeof window !== 'undefined') {
@@ -61,8 +69,33 @@ export function useWallet() {
     }
   };
 
+  const connectOkxWallet = async () => {
+    const provider = getWalletProvider('okx');
+    if (!provider) {
+      setError('OKX Wallet is not detected.');
+      return;
+    }
+
+    try {
+      const accounts = await provider.request({ method: 'eth_requestAccounts' });
+      setAccount(accounts[0] || null);
+      const id = await provider.request({ method: 'eth_chainId' });
+      setChainId(id);
+      setError(null);
+    } catch (err) {
+      setError(err?.message || 'Unable to connect OKX Wallet.');
+    }
+  };
+
+  const connectWalletConnect = () => {
+    if (typeof window !== 'undefined') {
+      window.open('https://walletconnect.com/', '_blank');
+      setError('WalletConnect opened in a new tab.');
+    }
+  };
+
   const switchToAbstract = async () => {
-    const provider = getEthereumProvider();
+    const provider = getWalletProvider();
     if (!provider) {
       setError(INSTALL_MESSAGE);
       if (typeof window !== 'undefined') {
@@ -135,6 +168,8 @@ export function useWallet() {
     chainId,
     error,
     connectMetaMask,
+    connectOkxWallet,
+    connectWalletConnect,
     switchToAbstract,
   };
 }
