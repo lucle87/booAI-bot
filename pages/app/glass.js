@@ -39,7 +39,12 @@ export default function GlassApp() {
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
-  const isSelectedChainConnected = selectedChainKey === 'abstractTestnet' && chainId === '0x1498b';
+  const isSelectedChainConnected = selectedChainKey === 'abstractTestnet' && chainId === '0x2b14';
+  const getNetworkLabel = (id) => {
+    if (!id) return 'unknown';
+    if (id === '0x2b14') return 'ARC Testnet';
+    return id;
+  };
   const contractReady = selectedTab === 'solidity'
     ? solidity.trim().length > 0 && solidity.trim() !== initialSolidity.trim()
     : abi.trim().length > 0 && bytecode.trim().length > 0 && (abi.trim() !== initialAbi.trim() || bytecode.trim() !== initialBytecode.trim());
@@ -194,7 +199,7 @@ export default function GlassApp() {
         {selectedChain && (
           <div className="card card-glass" style={{ marginTop: '1.5rem' }}>
             <p className="tag">Account: {account || 'not connected'}</p>
-            <p className="tag">Network: {chainId || 'unknown'}{isSelectedChainConnected ? ` (${selectedChain.name})` : ''}</p>
+            <p className="tag">Network: {getNetworkLabel(chainId)}{isSelectedChainConnected ? ` (${selectedChain.name})` : ''}</p>
             {!account && isSelectedChainLive && (
               <button className="button" style={{ width: '100%' }} onClick={connectMetaMask}>Connect Wallet →</button>
             )}
@@ -204,7 +209,17 @@ export default function GlassApp() {
             {account && isSelectedChainConnected && (
               <p style={{ color: '#d9e9ff', marginTop: '1rem' }}>Wallet connected to {selectedChain.name}.</p>
             )}
-            {error && <p style={{ color: '#ffb3a7', marginTop: '1rem' }}>{error}</p>}
+            {error && (
+              error.includes('metamask.io') ? (
+                <p style={{ color: '#ffb3a7', marginTop: '1rem' }}>
+                  <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                    {error}
+                  </a>
+                </p>
+              ) : (
+                <p style={{ color: '#ffb3a7', marginTop: '1rem' }}>{error}</p>
+              )
+            )}
           </div>
         )}
       </section>
