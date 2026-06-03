@@ -1,251 +1,594 @@
-import Link from 'next/link';
+﻿import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-const networks = [
-  { id: 'ethereum', icon: '⟠', name: 'Ethereum', status: 'Soon' },
-  { id: 'bnb', icon: '🟡', name: 'BNB Chain', status: 'Soon' },
-  { id: 'polygon', icon: '🟦', name: 'Polygon', status: 'Soon' },
-  { id: 'arbitrum', icon: '🟣', name: 'Arbitrum', status: 'Soon' },
-  { id: 'optimism', icon: '🔵', name: 'Optimism', status: 'Soon' },
-  { id: 'base', icon: '🟤', name: 'Base', status: 'Soon' },
-  { id: 'avalanche', icon: '🟥', name: 'Avalanche', status: 'Soon' },
-  { id: 'arcTestnet', icon: '⬡', name: 'ARC Testnet', status: 'Live' },
+const tools = [
+  {
+    icon: '🤖',
+    meta: '// AI Assistant · Claude Sonnet · Natural Language',
+    title: 'Chat to Deploy',
+    description: 'Describe your contract in plain English. AI asks questions and generates Solidity code automatically.',
+    tags: ['Claude AI', 'Natural Language', 'Auto-Generate'],
+  },
+  {
+    icon: '⚡',
+    meta: '// Solidity · ERC20 · One-Click',
+    title: 'Token Launcher',
+    description: 'Deploy ERC20 tokens with custom name, symbol, supply in seconds.',
+    tags: ['ERC20', 'Custom Supply', 'Instant'],
+  },
+  {
+    icon: '🖼️',
+    meta: '// ERC721 · NFT · Metadata',
+    title: 'NFT Collection',
+    description: 'Launch NFT collections with metadata, max supply, mint price.',
+    tags: ['ERC721', 'NFT', 'Coming Soon'],
+  },
+  {
+    icon: '🔒',
+    meta: '// Solidity · ABI · Bytecode',
+    title: 'Custom Contract',
+    description: 'Upload your own ABI + Bytecode or paste raw Solidity. Full control.',
+    tags: ['ABI', 'Bytecode', 'Advanced'],
+  },
+  {
+    icon: '🛡️',
+    meta: '// Claude AI · Security · Audit',
+    title: 'AI Security Audit',
+    description: 'Automatic vulnerability detection. Reentrancy, overflow, access control checks.',
+    tags: ['Security', 'AI Audit', 'Free'],
+  },
+  {
+    icon: '🌐',
+    meta: '// Multi-chain · Coming Soon',
+    title: 'Multi-Chain Deploy',
+    description: 'Deploy to Ethereum, BNB, Polygon, Arbitrum from one interface.',
+    tags: ['Multi-Chain', 'Coming Soon'],
+  },
+];
+
+const infra = [
+  {
+    title: 'ARC NETWORK',
+    subtitle: 'Purpose-built testnet for smart contract deployment',
+  },
+  {
+    title: 'CLAUDE AI',
+    subtitle: "Anthropic's AI for security review and code generation",
+  },
 ];
 
 export default function Home() {
   const router = useRouter();
+
   return (
-    <main>
-      <header className="header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/logo.png" alt="logo" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
-          <div className="brand" style={{ fontSize: '75%' }}>booAI_bot</div>
-        </div>
-      </header>
+    <>
+      <Head>
+        <title>booAI_bot — ARC Testnet Deploy Suite</title>
+        <meta name="description" content="Brutalist AI contract deployer for ARC Testnet with MetaMask, OKX Wallet and Claude AI." />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+      </Head>
 
-      <section style={{ position: 'relative', overflow: 'hidden' }}>
-        {/* Background decorative elements */}
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
-          {/* Grid lines */}
-          <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#6d74c8" strokeWidth="0.5" opacity="0.1" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-          
-          {/* Floating orbs */}
-          <circle cx="80%" cy="15%" r="40" fill="#a370f0" opacity="0.15" />
-          <circle cx="75%" cy="25%" r="25" fill="#00d9ff" opacity="0.12" />
-          <circle cx="85%" cy="40%" r="35" fill="#a370f0" opacity="0.1" />
-          <circle cx="88%" cy="60%" r="20" fill="#00d9ff" opacity="0.15" />
-          
-          {/* Floating code snippets */}
-          <text x="78%" y="20%" fontSize="14" fill="#6d74c8" opacity="0.2" fontFamily="monospace">pragma solidity</text>
-          <text x="80%" y="50%" fontSize="12" fill="#00d9ff" opacity="0.15" fontFamily="monospace">contract</text>
-          <text x="75%" y="75%" fontSize="13" fill="#a370f0" opacity="0.18" fontFamily="monospace">deploy()</text>
-        </svg>
+      <main className="page">
+        <nav className="navBar">
+          <div className="navBrand">
+            <span className="logoCircle">B</span>
+            <span className="brandText">BOOAI_BOT</span>
+          </div>
 
-        <div className="grid" style={{ gap: '2.5rem', position: 'relative', zIndex: 1 }}>
-          <div>
-            <h1 className="title">AI Smart Contract Deployer</h1>
-            <p className="subtitle">
-              Create, review, and deploy Solidity contracts with MetaMask and USDC.
-            </p>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.8rem' }}>
-              <button className="button" onClick={() => router.push('/app/dark')}>Get started</button>
+          <div className="navTicker" aria-label="web3 ticker">
+            <div className="tickerTrack">
+              <span>◆ AI CONTRACT DEPLOYER · ARC TESTNET ◆ METAMASK · OKX WALLET ◆ SOLIDITY · ABI + BYTECODE ◆ 0.1 USDC PER DEPLOY ◆ MULTI-CHAIN COMING SOON ◆</span>
+              <span>◆ AI CONTRACT DEPLOYER · ARC TESTNET ◆ METAMASK · OKX WALLET ◆ SOLIDITY · ABI + BYTECODE ◆ 0.1 USDC PER DEPLOY ◆ MULTI-CHAIN COMING SOON ◆</span>
             </div>
           </div>
-          
-          {/* Anime AI Girl - Desktop only */}
-          <div style={{ display: 'none', '@media (min-width: 1024px)': { display: 'flex' } }}>
-            <svg viewBox="0 0 300 500" style={{ height: '500px', width: 'auto', opacity: 0.85 }}>
-              <defs>
-                <linearGradient id="hairGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style={{ stopColor: '#a370f0', stopOpacity: 0.8 }} />
-                  <stop offset="100%" style={{ stopColor: '#00d9ff', stopOpacity: 0.6 }} />
-                </linearGradient>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              
-              {/* Hair with glow */}
-              <path d="M 80 60 Q 60 100 65 160 Q 70 220 85 280 Q 90 320 100 360 Q 110 350 115 280 Q 120 200 125 160 L 150 40 L 175 160 Q 180 200 185 280 Q 190 350 200 360 Q 210 320 215 280 Q 230 220 235 160 Q 240 100 220 60 Q 200 40 150 35 Q 100 40 80 60 Z" 
-                    fill="url(#hairGlow)" stroke="#00d9ff" strokeWidth="1.5" filter="url(#glow)" opacity="0.9" />
-              
-              {/* Head */}
-              <circle cx="150" cy="120" r="45" fill="#f5e6d3" stroke="#d4a574" strokeWidth="1" />
-              
-              {/* Eyes with glow */}
-              <circle cx="130" cy="110" r="8" fill="#00d9ff" stroke="#a370f0" strokeWidth="1" filter="url(#glow)" />
-              <circle cx="170" cy="110" r="8" fill="#00d9ff" stroke="#a370f0" strokeWidth="1" filter="url(#glow)" />
-              <circle cx="132" cy="108" r="3" fill="#ffffff" opacity="0.8" />
-              <circle cx="172" cy="108" r="3" fill="#ffffff" opacity="0.8" />
-              
-              {/* Nose */}
-              <line x1="150" y1="120" x2="150" y2="135" stroke="#d4a574" strokeWidth="1" />
-              
-              {/* Mouth */}
-              <path d="M 140 145 Q 150 150 160 145" stroke="#d4a574" strokeWidth="1.5" fill="none" />
-              
-              {/* Neck */}
-              <rect x="140" y="165" width="20" height="25" fill="#f5e6d3" stroke="#d4a574" strokeWidth="0.5" />
-              
-              {/* Tech outfit - torso */}
-              <path d="M 120 190 L 110 280 Q 110 300 125 310 L 175 310 Q 190 300 190 280 L 180 190 Z" 
-                    fill="#2a2a4a" stroke="#00d9ff" strokeWidth="1.5" opacity="0.9" />
-              
-              {/* Shoulder tech details */}
-              <circle cx="115" cy="195" r="6" fill="#a370f0" opacity="0.7" stroke="#00d9ff" strokeWidth="1" filter="url(#glow)" />
-              <circle cx="185" cy="195" r="6" fill="#a370f0" opacity="0.7" stroke="#00d9ff" strokeWidth="1" filter="url(#glow)" />
-              
-              {/* Arms */}
-              <path d="M 120 210 L 80 260" stroke="#f5e6d3" strokeWidth="12" strokeLinecap="round" />
-              <path d="M 180 210 L 220 260" stroke="#f5e6d3" strokeWidth="12" strokeLinecap="round" />
-              
-              {/* Hands */}
-              <circle cx="80" cy="265" r="8" fill="#f5e6d3" stroke="#d4a574" strokeWidth="0.5" />
-              <circle cx="220" cy="265" r="8" fill="#f5e6d3" stroke="#d4a574" strokeWidth="0.5" />
-              
-              {/* Holographic code display near hand */}
-              <rect x="60" y="245" width="50" height="40" fill="none" stroke="#00d9ff" strokeWidth="1" opacity="0.6" rx="4" />
-              <text x="68" y="260" fontSize="8" fill="#00d9ff" opacity="0.7" fontFamily="monospace">contract</text>
-              <text x="68" y="272" fontSize="8" fill="#a370f0" opacity="0.7" fontFamily="monospace">deploy()</text>
-              
-              {/* Legs */}
-              <path d="M 135 310 L 130 400" stroke="#2a2a4a" strokeWidth="14" strokeLinecap="round" />
-              <path d="M 165 310 L 170 400" stroke="#2a2a4a" strokeWidth="14" strokeLinecap="round" />
-              
-              {/* Boots */}
-              <rect x="120" y="395" width="20" height="25" fill="#a370f0" stroke="#00d9ff" strokeWidth="1" opacity="0.8" rx="3" />
-              <rect x="160" y="395" width="20" height="25" fill="#a370f0" stroke="#00d9ff" strokeWidth="1" opacity="0.8" rx="3" />
-              
-              {/* Floating particles around her */}
-              <circle cx="90" cy="150" r="2" fill="#00d9ff" opacity="0.6" />
-              <circle cx="210" cy="200" r="2.5" fill="#a370f0" opacity="0.5" />
-              <circle cx="100" cy="350" r="1.5" fill="#00d9ff" opacity="0.7" />
-              <circle cx="200" cy="320" r="2" fill="#a370f0" opacity="0.6" />
-            </svg>
+
+          <button className="navButton" onClick={() => router.push('/app/dark')}>Get Started →</button>
+        </nav>
+
+        <div className="topTicker" aria-hidden="true">
+          <div className="tickerTrack small">
+            <span>◆ DEPLOY ERC20 · ARC TESTNET ◆ SOLIDITY COMPILER ◆ AI SECURITY AUDIT ◆ 0.1 USDC FEE ◆ METAMASK + OKX ◆ MULTI-CHAIN SOON ◆</span>
+            <span>◆ DEPLOY ERC20 · ARC TESTNET ◆ SOLIDITY COMPILER ◆ AI SECURITY AUDIT ◆ 0.1 USDC FEE ◆ METAMASK + OKX ◆ MULTI-CHAIN SOON ◆</span>
           </div>
         </div>
-      </section>
-      
+
+        <section className="heroSection">
+          <span className="heroLabel">CONTRACT DEPLOYER · ARC TESTNET · AI POWERED</span>
+          <h1 className="heroTitle">
+            <span>BOOAI_BOT</span>
+            <span className="heroAccent">DEPLOY SUITE</span>
+          </h1>
+          <p className="heroCopy">Every smart contract you need to launch — all in one place. AI review. One-click deploy. Multi-chain ready.</p>
+
+          <div className="statusRow">
+            <span className="statusBadge live">CONTRACT LIVE</span>
+            <span className="statusBadge">AI ARMED</span>
+            <span className="statusBadge">ARC TESTNET</span>
+            <span className="statusBadge">USDC NATIVE</span>
+          </div>
+
+          <div className="statRow">
+            <div className="statItem"><span className="statLabel">Contract Fee</span>0.1 USDC</div>
+            <div className="statItem"><span className="statLabel">Network</span>ARC Testnet</div>
+            <div className="statItem"><span className="statLabel">AI</span>Claude Sonnet</div>
+            <div className="statItem"><span className="statLabel">Chains</span>8+</div>
+          </div>
+        </section>
+
+        <section className="toolsSection">
+          <div className="sectionHeader">
+            <span className="sectionLabel">Deploy Tools</span>
+          </div>
+
+          <div className="toolsGrid">
+            {tools.map((tool) => (
+              <article key={tool.title} className="toolCard">
+                <p className="toolMeta">{tool.icon} {tool.meta}</p>
+                <h2>{tool.title}</h2>
+                <p>{tool.description}</p>
+                <div className="toolTags">
+                  {tool.tags.map((tag) => (
+                    <span key={tag} className="toolTag">{tag}</span>
+                  ))}
+                </div>
+                <button className="toolLink" type="button">Explore →</button>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="infraSection">
+          {infra.map((item) => (
+            <div key={item.title} className="infraCard">
+              <p className="infraLabel">{item.title}</p>
+              <h3>{item.title}</h3>
+              <p>{item.subtitle}</p>
+            </div>
+          ))}
+        </section>
+
+        <footer className="footerSection">
+          <div className="footerLeft">
+            <span className="logoCircle small">B</span>
+            <span>BOOAI_BOT</span>
+          </div>
+
+          <div className="footerLinks">
+            <button type="button">Deploy</button>
+            <button type="button">AI Review</button>
+            <button type="button">Multi-Chain</button>
+            <button type="button">Docs</button>
+          </div>
+
+          <div className="footerRight">CONTRACT DEPLOYER · ARC TESTNET · CLAUDE AI</div>
+        </footer>
+
+        <div className="footerMeta">// ARC Testnet · USDC Native · AI Powered</div>
+      </main>
+
       <style jsx>{`
-        @media (max-width: 1023px) {
-          div:has(svg) {
-            display: none !important;
+        :global(html) {
+          background: #05050a;
+          color: #f0f0f5;
+          font-family: 'Space Grotesk', sans-serif;
+        }
+
+        :global(body) {
+          margin: 0;
+          background: #05050a;
+        }
+
+        .page {
+          min-height: 100vh;
+          padding: 28px 32px;
+          display: flex;
+          flex-direction: column;
+          gap: 32px;
+          max-width: 1440px;
+          margin: 0 auto;
+        }
+
+        .navBar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          border: 1px solid rgba(255,255,255,0.08);
+          padding: 18px 22px;
+          background: #0c0c14;
+          border-radius: 20px;
+        }
+
+        .navBrand {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .logoCircle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: #13131c;
+          border: 1px solid rgba(255,255,255,0.1);
+          font-family: 'Space Mono', monospace;
+          font-weight: 700;
+          letter-spacing: -0.04em;
+          color: #9b7fff;
+        }
+
+        .brandText {
+          font-family: 'Space Grotesk', sans-serif;
+          font-weight: 800;
+          letter-spacing: -0.05em;
+          font-size: 0.95rem;
+          color: #f0f0f5;
+        }
+
+        .navTicker {
+          overflow: hidden;
+          flex: 1;
+          min-width: 0;
+          border: 1px solid rgba(255,255,255,0.06);
+          background: rgba(255,255,255,0.02);
+          padding: 11px 0;
+          border-radius: 16px;
+        }
+
+        .tickerTrack {
+          display: inline-flex;
+          gap: 52px;
+          white-space: nowrap;
+          animation: scroll 24s linear infinite;
+          font-family: 'Space Mono', monospace;
+          font-size: 11px;
+          color: #6b6b85;
+          padding-left: 16px;
+        }
+
+        .tickerTrack.small {
+          font-size: 11px;
+          color: #8b8b9f;
+          letter-spacing: 0.1em;
+        }
+
+        .topTicker {
+          overflow: hidden;
+          border-radius: 16px;
+          background: #0c0c14;
+          border: 1px solid rgba(255,255,255,0.06);
+          padding: 10px 0;
+        }
+
+        .navButton,
+        .toolLink,
+        .footerLinks button {
+          font-family: 'Space Grotesk', sans-serif;
+          border: 1px solid rgba(155,127,255,0.35);
+          background: transparent;
+          color: #f0f0f5;
+          padding: 12px 18px;
+          border-radius: 14px;
+          cursor: pointer;
+          transition: border-color 180ms ease, transform 180ms ease;
+        }
+
+        .navButton:hover,
+        .toolLink:hover,
+        .footerLinks button:hover {
+          border-color: #9b7fff;
+          transform: translateY(-1px);
+        }
+
+        .heroSection {
+          padding: 34px;
+          border: 1px solid rgba(255,255,255,0.06);
+          background: #0c0c14;
+          border-radius: 24px;
+          display: grid;
+          gap: 24px;
+        }
+
+        .heroLabel,
+        .sectionLabel,
+        .statLabel,
+        .toolMeta,
+        .infraLabel,
+        .footerMeta {
+          font-family: 'Space Mono', monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.18em;
+          font-size: 0.7rem;
+          color: #6b6b85;
+        }
+
+        .heroTitle {
+          margin: 0;
+          display: grid;
+          gap: 10px;
+          font-size: clamp(3.6rem, 7vw, 7.6rem);
+          line-height: 0.92;
+          letter-spacing: -0.08em;
+          font-weight: 800;
+          font-family: 'Space Grotesk', sans-serif;
+          text-transform: uppercase;
+        }
+
+        .heroTitle span {
+          display: block;
+        }
+
+        .heroAccent {
+          background: linear-gradient(90deg, #9b7fff 0%, #3de8c8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .heroCopy {
+          margin: 0;
+          max-width: 820px;
+          color: #d8d8e8;
+          font-size: 1.05rem;
+          line-height: 1.9;
+        }
+
+        .statusRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .statusBadge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 14px;
+          border-radius: 999px;
+          font-family: 'Space Mono', monospace;
+          font-size: 0.75rem;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: #f0f0f5;
+        }
+
+        .statusBadge.live {
+          border-color: #3de8c8;
+          position: relative;
+        }
+
+        .statusBadge.live::before {
+          content: '';
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #3de8c8;
+          box-shadow: 0 0 0 0 rgba(61,232,200,0.55);
+          animation: pulse 1.8s infinite ease-in-out;
+        }
+
+        .statRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 18px;
+        }
+
+        .statItem {
+          min-width: 220px;
+          padding: 16px 18px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 18px;
+          font-weight: 700;
+          line-height: 1.5;
+        }
+
+        .statItem .statLabel {
+          display: block;
+          color: #6b6b85;
+          font-weight: 400;
+          margin-bottom: 4px;
+        }
+
+        .toolsSection {
+          display: grid;
+          gap: 22px;
+        }
+
+        .sectionHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .toolsGrid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 20px;
+        }
+
+        .toolCard {
+          padding: 22px;
+          background: #0c0c14;
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 22px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          transition: border-color 180ms ease, transform 180ms ease;
+        }
+
+        .toolCard:hover {
+          border-color: #9b7fff;
+          transform: translateY(-2px);
+        }
+
+        .toolMeta {
+          margin: 0;
+          color: #6b6b85;
+          font-size: 0.78rem;
+        }
+
+        .toolCard h2 {
+          margin: 0;
+          font-size: 1.45rem;
+          font-weight: 800;
+          letter-spacing: -0.04em;
+        }
+
+        .toolCard p {
+          margin: 0;
+          color: #d8d8e8;
+          line-height: 1.8;
+        }
+
+        .toolTags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .toolTag {
+          display: inline-flex;
+          padding: 8px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04);
+          font-family: 'Space Mono', monospace;
+          font-size: 0.72rem;
+          color: #c8c8e1;
+        }
+
+        .infraSection {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 20px;
+        }
+
+        .infraCard {
+          padding: 26px;
+          border-radius: 22px;
+          background: #0c0c14;
+          border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .infraCard h3 {
+          margin: 10px 0 0;
+          font-size: 1.9rem;
+          letter-spacing: -0.06em;
+        }
+
+        .infraCard p {
+          margin: 14px 0 0;
+          color: #c8c8e1;
+          line-height: 1.9;
+        }
+
+        .footerSection {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          gap: 18px;
+          padding: 22px;
+          border: 1px solid rgba(255,255,255,0.06);
+          background: #0c0c14;
+          border-radius: 20px;
+        }
+
+        .footerLeft,
+        .footerRight {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-family: 'Space Grotesk', sans-serif;
+          letter-spacing: -0.02em;
+          font-size: 0.95rem;
+        }
+
+        .footerLinks {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .footerMeta {
+          font-family: 'Space Mono', monospace;
+          font-size: 0.75rem;
+          color: #6b6b85;
+          text-align: center;
+        }
+
+        @media (max-width: 1200px) {
+          .toolsGrid,
+          .infraSection {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 860px) {
+          .navBar,
+          .heroSection,
+          .footerSection {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .navTicker {
+            min-width: 100%;
+          }
+
+          .statRow {
+            flex-direction: column;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .page {
+            padding: 20px;
+          }
+
+          .navBar,
+          .topTicker,
+          .heroSection,
+          .toolCard,
+          .infraCard,
+          .footerSection {
+            padding: 18px;
+          }
+
+          .heroTitle {
+            font-size: 3.6rem;
+          }
+
+          .navButton,
+          .toolLink,
+          .footerLinks button {
+            width: 100%;
+          }
+        }
+
+        @keyframes scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(61,232,200,0.55);
+          }
+          70% {
+            box-shadow: 0 0 0 12px rgba(61,232,200,0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(61,232,200,0);
           }
         }
       `}</style>
-
-      <section>
-        <div className="header" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <h2 className="section-title">Multi-Chain Support</h2>
-          </div>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          {networks.map((network) => (
-            <div key={network.id} className="card" style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '1rem',
-              ...(network.status === 'Live' && {
-                border: '1px solid rgba(155, 127, 255, 0.5)',
-                background: 'rgba(155, 127, 255, 0.08)'
-              })
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-                <span style={{ fontSize: '1.6rem' }}>{network.icon}</span>
-                <div>
-                  <h3 style={{ margin: 0 }}>{network.name}</h3>
-                  <p style={{ margin: 0, color: '#a9b2d4', fontSize: '0.95rem' }}>{network.status === 'Live' ? 'Live deployment support' : 'Coming soon'}</p>
-                </div>
-              </div>
-              <span className="tag" style={{ background: network.status === 'Live' ? '#2bad6f' : 'rgba(255, 255, 255, 0.08)', color: network.status === 'Live' ? '#ecfff3' : '#cbd6ff' }}>
-                {network.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <div className="header" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <h2 className="section-title">Features</h2>
-            <p className="section-text">A fast platform to prepare, review, and deploy contracts with a smart workflow.</p>
-          </div>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-          <div className="card">
-            <h3>MetaMask connect</h3>
-            <p>Easy wallet connection and chain selection before deployment.</p>
-          </div>
-          <div className="card">
-            <h3>AI contract review</h3>
-            <p>Send Solidity to Anthropic for security and quality feedback.</p>
-          </div>
-          <div className="card">
-            <h3>USDC payment</h3>
-            <p>Pay 0.1 USDC to deploy your contract with confidence.</p>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <div className="header" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <h2 className="section-title">How it works</h2>
-            <p className="section-text">Choose a style, select a network, connect your wallet, review code, and deploy quickly.</p>
-          </div>
-        </div>
-        <div className="list-card">
-          <div>
-            <strong>1.</strong> Pick the interface that fits your workflow.
-          </div>
-          <div>
-            <strong>2.</strong> Select a network and connect MetaMask.
-          </div>
-          <div>
-            <strong>3.</strong> Paste Solidity or ABI + Bytecode, click AI Review, and get feedback.
-          </div>
-          <div>
-            <strong>4.</strong> Pay 0.1 USDC and deploy the contract.
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <div className="header" style={{ alignItems: 'flex-start' }}>
-          <div>
-            <h2 className="section-title">Roadmap</h2>
-            <p className="section-text">Next goals: open source, multi-chain support, and automated contract testing.</p>
-          </div>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-          <div className="card card-dark">
-            <h3>Q3</h3>
-            <p>Polish AI review experience and support more input formats.</p>
-          </div>
-          <div className="card card-dark">
-            <h3>Q4</h3>
-            <p>Deploy to additional chains and add automatic ABI discovery.</p>
-          </div>
-        </div>
-      </section>
-
-      <footer className="footer">
-        <p>booAI_bot © 2026 — AI Smart Contract Deployer.</p>
-        <div>
-          <Link href="/picker" className="button-secondary">Choose style</Link>
-        </div>
-      </footer>
-    </main>
+    </>
   );
 }
