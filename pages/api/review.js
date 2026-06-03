@@ -5,9 +5,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt } = req.body;
-  if (!prompt) {
-    return res.status(400).json({ error: 'Request body must include prompt.' });
+  const { contractCode } = req.body;
+  if (!contractCode) {
+    return res.status(400).json({ error: 'Request body must include contractCode.' });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       'https://api.anthropic.com/v1/complete',
       {
         model: 'claude-3.5-mini',
-        prompt: `Review the following Solidity contract code and provide a concise security and quality review. If there are issues, explain them and suggest improvements.\n\n${prompt}`,
+        prompt: `Review the following Solidity contract for ARC Testnet deployment. Provide a concise security analysis, gas considerations, and any recommended improvements.\n\n${contractCode}`,
         max_tokens_to_sample: 450,
         temperature: 0.2,
         stop_sequences: ['\n\nHuman:'],
