@@ -39,7 +39,23 @@ export default function App() {
   function now() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
+const ARC_CHAIN = {
+  chainId: '0x4CDEF2',
+  chainName: 'ARC Testnet',
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+  rpcUrls: ['https://rpc.testnet.arc.network'],
+  blockExplorerUrls: ['https://testnet.arcscan.app'],
+}
 
+const switchToARC = async (provider) => {
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x4CDEF2' }] })
+  } catch (err) {
+    if (err.code === 4902) {
+      await provider.request({ method: 'wallet_addEthereumChain', params: [ARC_CHAIN] })
+    } else throw err
+  }
+}
   const connectWallet = async (type) => {
     let provider = null
     if (type === 'okx') {
@@ -51,10 +67,11 @@ export default function App() {
     }
     try {
       const accounts = await provider.request({ method: 'eth_requestAccounts' })
-      const addr = accounts[0]
-      setWallet(addr)
-      setShowWalletModal(false)
-      addMessage('ai', `✅ Wallet connected: \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n\nYou're on ARC Testnet. What would you like to build today?`)
+const addr = accounts[0]
+await switchToARC(provider)
+setWallet(addr)
+setShowWalletModal(false)
+      addMessage('ai', `✅ Wallet connected: \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n\n🔗 Switched to **ARC Testnet** (Chain ID: 5042002)\n\nWhat would you like to build today?`)
     } catch (err) {
       addMessage('ai', `❌ Connection failed: ${err.message}`)
     }
