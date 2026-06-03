@@ -4,14 +4,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { messages, walletConnected } = req.body
+  const { messages } = req.body
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Messages are required' })
   }
 
-  if (!process.env.GOOGLE_AI_KEY) {
-    return res.status(500).json({ error: 'Google AI key is not configured.' })
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'Groq API key is not configured.' })
   }
 
   const systemPrompt = `You are booAI_bot, a smart AI agent on ARC Testnet. You help users build and deploy Web3 projects through natural conversation.
@@ -19,10 +19,10 @@ export default async function handler(req, res) {
 LANGUAGE RULE: Always respond in the same language the user writes in.
 - User writes Vietnamese → respond in Vietnamese
 - User writes English → respond in English
-- User writes any other language → respond in that language
+- Any other language → respond in that same language
 - Never switch languages unless the user does first
 
-IF USER IS UNCLEAR: Never say "I don't understand". Always ask ONE simple clarifying question to guide them. Be patient and helpful like a friendly assistant.
+IF USER IS UNCLEAR: Never say "I don't understand". Always ask ONE simple friendly question to guide them. Be patient like a helpful assistant.
 
 YOUR CAPABILITIES:
 1. DEPLOY_ERC20 — Deploy ERC20 tokens (name, symbol, supply, decimals)
@@ -40,10 +40,9 @@ YOUR CAPABILITIES:
 
 CONVERSATION RULES:
 - Be friendly, concise, and helpful
-- Ask for ONE parameter at a time
-- When you have ALL required info, respond with special JSON format below
+- Ask for ONE parameter at a time — never ask multiple questions at once
+- When you have ALL required info, respond with the special JSON format below
 - Always mention 0.1 USDC cost before executing
-- Support all languages
 
 PARAMETER COLLECTION:
 - ERC20: name, symbol, totalSupply, decimals (default 18)
@@ -57,7 +56,7 @@ PARAMETER COLLECTION:
 - Website: site name, description, sections
 - DAO Token: name, symbol, supply, voting mechanism
 
-WHEN ALL INFO IS COLLECTED respond ONLY with this JSON (no other text):
+WHEN ALL INFO IS COLLECTED respond ONLY with this JSON (no markdown, no extra text):
 {
   "ready": true,
   "taskType": "DEPLOY_ERC20",
@@ -73,37 +72,30 @@ WHEN ALL INFO IS COLLECTED respond ONLY with this JSON (no other text):
 }`
 
   try {
-    // Build conversation for Gemini
-    const geminiMessages = messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    }))
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_AI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          contents: geminiMessages,
-          generationConfig: {
-            maxOutputTokens: 1000,
-            temperature: 0.7,
-          }
-        })
-      }
-    )
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1000,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ],
+      }),
+    })
 
     if (!response.ok) {
       const errData = await response.json()
-      throw new Error(errData.error?.message || `Gemini API error ${response.status}`)
+      throw new Error(errData.error?.message || `Groq API error ${response.status}`)
     }
 
     const data = await response.json()
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const rawText = data.choices?.[0]?.message?.content || ''
 
     // Try to parse as JSON (task ready response)
     let parsed = null
