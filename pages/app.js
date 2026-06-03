@@ -15,8 +15,11 @@ export default function App() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [pendingTask, setPendingTask] = useState(null)
   const [conversationHistory, setConversationHistory] = useState([])
+  const [attachedFile, setAttachedFile] = useState(null)
+  const [attachedPreview, setAttachedPreview] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     setMounted(true)
@@ -68,14 +71,44 @@ export default function App() {
     setMessages(prev => [...prev, { role, content, time: now(), ...extra }])
   }
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setAttachedFile(file)
+    if (file.type.startsWith('image/')) {
+      setAttachedPreview(URL.createObjectURL(file))
+    } else {
+      setAttachedPreview(null)
+    }
+    e.target.value = ''
+  }
+
+  const removeFile = () => {
+    setAttachedFile(null)
+    setAttachedPreview(null)
+  }
+
   const handleSend = async (text) => {
     const msg = text || input.trim()
-    if (!msg) return
+    if (!msg && !attachedFile) return
     setInput('')
-    addMessage('user', msg)
-    setLoading(true)
 
-    const newHistory = [...conversationHistory, { role: 'user', content: msg }]
+    // Build message content
+    const displayMsg = msg || (attachedFile ? `📎 ${attachedFile.name}` : '')
+    addMessage('user', displayMsg, {
+      filePreview: attachedPreview,
+      fileName: attachedFile?.name,
+      fileType: attachedFile?.type,
+    })
+
+    // Include file info in AI message
+    const aiMsg = attachedFile
+      ? `${msg ? msg + '\n\n' : ''}[User attached file: ${attachedFile.name} (${attachedFile.type})]`
+      : msg
+
+    removeFile()
+    setLoading(true)
+    const newHistory = [...conversationHistory, { role: 'user', content: aiMsg }]
     setConversationHistory(newHistory)
 
     try {
@@ -274,7 +307,16 @@ export default function App() {
         .btn-pay { flex: 2; padding: 12px; background: #8b6fff; border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
         .btn-pay:hover { opacity: 0.85; }
 
-        @media (max-width: 768px) {
+        .file-preview { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; }
+        .file-preview img { height: 48px; width: 48px; object-fit: cover; border-radius: 6px; }
+        .file-preview-name { font-size: 12px; color: #eeeef5; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-preview-size { font-size: 10px; color: #52526a; font-family: 'Space Mono', monospace; }
+        .file-remove { background: none; border: none; color: #52526a; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.2s; }
+        .file-remove:hover { color: #ff6b6b; }
+        .upload-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; color: #52526a; }
+        .upload-btn:hover { background: rgba(139,111,255,0.1); border-color: #8b6fff; color: #8b6fff; }
+        .bubble-img { max-width: 200px; max-height: 150px; border-radius: 8px; margin-bottom: 6px; display: block; object-fit: cover; }
+        .bubble-file { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 6px; margin-bottom: 6px; }
           .app-layout { grid-template-columns: 1fr; }
           .sidebar { display: none; }
         }
@@ -356,14 +398,18 @@ export default function App() {
                   {m.role === 'ai' ? '🤖' : '👤'}
                 </div>
                 <div className="msg-content">
-                  <div className={`bubble ${m.role === 'user' ? 'user' : m.type === 'success' ? 'success' : 'ai'}`}
-                    dangerouslySetInnerHTML={{
+                  <div className={`bubble ${m.role === 'user' ? 'user' : m.type === 'success' ? 'success' : 'ai'}`}>
+                    {m.filePreview && <img src={m.filePreview} alt="attachment" className="bubble-img" />}
+                    {m.fileName && !m.filePreview && (
+                      <div className="bubble-file">📎 {m.fileName}</div>
+                    )}
+                    <span dangerouslySetInnerHTML={{
                       __html: m.content
                         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         .replace(/`(.*?)`/g, '<code>$1</code>')
                         .replace(/\n/g, '<br/>')
-                    }}
-                  />
+                    }} />
+                  </div>
                   <div className="msg-time">{m.time}</div>
                 </div>
               </div>
@@ -393,7 +439,36 @@ export default function App() {
 
           {/* INPUT */}
           <div className="input-area">
+            {/* FILE PREVIEW */}
+            {attachedFile && (
+              <div className="file-preview">
+                {attachedPreview
+                  ? <img src={attachedPreview} alt="preview" />
+                  : <span style={{ fontSize: 24 }}>{attachedFile.type.startsWith('video/') ? '🎬' : '📎'}</span>
+                }
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="file-preview-name">{attachedFile.name}</div>
+                  <div className="file-preview-size">{(attachedFile.size / 1024).toFixed(1)} KB</div>
+                </div>
+                <button className="file-remove" onClick={removeFile}>✕</button>
+              </div>
+            )}
+
             <div className="input-box">
+              {/* UPLOAD BUTTON */}
+              <button className="upload-btn" onClick={() => fileInputRef.current?.click()} title="Attach file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept="image/*,video/*,.pdf,.sol"
+                onChange={handleFileSelect}
+              />
+
               <textarea
                 ref={inputRef}
                 rows={1}
@@ -409,13 +484,13 @@ export default function App() {
                 placeholder="Describe what you want to build... (Enter to send)"
                 disabled={loading}
               />
-              <button className="send-btn" onClick={() => handleSend()} disabled={loading || !input.trim()}>
+              <button className="send-btn" onClick={() => handleSend()} disabled={loading || (!input.trim() && !attachedFile)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
                   <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
                 </svg>
               </button>
             </div>
-            <div className="input-hint">💡 Describe in plain English · 0.1 USDC per task · ARC Testnet</div>
+            <div className="input-hint">📎 Attach image/video · 💡 Describe in plain English · 0.1 USDC per task</div>
           </div>
         </div>
       </div>
