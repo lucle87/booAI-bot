@@ -42,7 +42,7 @@ export default function App() {
 const ARC_CHAIN = {
   chainId: '0x4CDEF2',
   chainName: 'ARC Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: ['https://rpc.testnet.arc.network'],
   blockExplorerUrls: ['https://testnet.arcscan.app'],
 }
