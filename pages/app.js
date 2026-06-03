@@ -124,9 +124,9 @@ export default function App() {
       setConversationHistory([...newHistory, assistantMsg])
 
       if (data.ready && data.taskType) {
-        setPendingTask(data)
-        addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-        setTimeout(() => setShowPayModal(true), 300)
+  addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
+  setPendingTask(data)
+  setShowPayModal(true)
       } else {
         addMessage('ai', data.reply)
       }
