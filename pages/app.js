@@ -531,7 +531,7 @@ export default function App() {
 
       {/* PAY MODAL */}
       {showPayModal && pendingTask && (
-        <div className="modal-overlay">
+  <div className="modal-overlay" style={{zIndex: 9999}}>
           <div className="pay-modal">
             <div className="modal-title">Confirm Task</div>
             <div className="modal-sub">Review and approve payment to execute</div>
