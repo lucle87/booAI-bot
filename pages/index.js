@@ -51,7 +51,7 @@ export default function Home() {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet" />
       </Head>
 
-      <style>{`
+      <style suppressHydrationWarning>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #06060f; color: #eeeef5; font-family: 'Inter', sans-serif; overflow-x: hidden; }
         h1,h2,h3,h4 { font-family: 'Space Grotesk', sans-serif; }
