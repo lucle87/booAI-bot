@@ -15,7 +15,10 @@ export default function Home() {
   return (
     <main>
       <header className="header">
-        <div className="brand">booAI_bot</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <img src="/logo.png" alt="logo" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+          <div className="brand" style={{ fontSize: '50%' }}>booAI_bot</div>
+        </div>
         <nav>
           <Link href="/picker" className="button-secondary">Choose style</Link>
         </nav>
@@ -24,7 +27,7 @@ export default function Home() {
       <section>
         <div className="grid" style={{ gap: '2.5rem' }}>
           <div>
-            <h1 className="title">booAI_bot — AI Smart Contract Deployer</h1>
+            <h1 className="title">AI Smart Contract Deployer</h1>
             <p className="subtitle">
               Create, review, and deploy Solidity contracts with MetaMask and USDC.
             </p>

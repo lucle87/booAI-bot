@@ -32,6 +32,10 @@ export default function LightApp() {
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState(null);
   const editorRef = useRef(null);
+  const [chatOpen, setChatOpen] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
 
   const selectedChain = selectedChainKey ? CHAINS[selectedChainKey] : null;
   const isSelectedChainLive = selectedChain?.status === 'live';
@@ -83,6 +87,36 @@ export default function LightApp() {
       setReviewError(err.message || 'Unable to complete review.');
     } finally {
       setReviewing(false);
+    }
+  };
+
+  const sendChat = async (text) => {
+    if (!text || chatLoading) return;
+    const userMsg = { role: 'user', text };
+    setMessages((m) => [...m, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history: messages }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        setMessages((m) => [...m, { role: 'assistant', text: 'Error: ' + String(data.error) }]);
+      } else {
+        const assistantText = data.assistant || (data.message || '');
+        setMessages((m) => [...m, { role: 'assistant', text: assistantText }]);
+        if (data.done && data.solidityCode) {
+          setSolidity(data.solidityCode);
+          setReview('');
+        }
+      }
+    } catch (err) {
+      setMessages((m) => [...m, { role: 'assistant', text: 'Chat service error.' }]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -173,17 +207,43 @@ export default function LightApp() {
       {selectedChain && account && (
         <section>
           <div className="card card-light">
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-              {['solidity', 'abi'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSelectedTab(tab)}
-                  className="button-secondary"
-                  style={{ opacity: selectedTab === tab ? 1 : 0.7 }}
-                >
-                  {tab === 'solidity' ? 'Solidity' : 'ABI + Bytecode'}
-                </button>
-              ))}
+            {/* Chat Assistant */}
+            <div style={{ marginBottom: '1rem', border: '1px solid rgba(0,0,0,0.06)', padding: '0.5rem', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <strong style={{ color: '#3c76ff' }}>AI Assistant</strong>
+                <div>
+                  <button className="button-secondary" onClick={() => setChatOpen(!chatOpen)}>{chatOpen ? 'Minimize' : 'Expand'}</button>
+                </div>
+              </div>
+              {chatOpen && (
+                <div>
+                  <div style={{ maxHeight: 180, overflowY: 'auto', padding: '0.5rem', background: 'rgba(0,0,0,0.02)', borderRadius: 6 }}>
+                    {messages.map((m, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: m.role === 'assistant' ? 'flex-start' : 'flex-end', marginTop: 8 }}>
+                        <div style={{ maxWidth: '82%', padding: '0.5rem 0.75rem', borderRadius: 12, background: m.role === 'assistant' ? '#e7f1ff' : 'rgba(17,42,80,0.06)', color: m.role === 'assistant' ? '#0f2b59' : '#0f2b59' }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '11px', color: '#666', marginBottom: 6 }}>
+                        💡 Describe your contract in plain English
+                      </p>
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') sendChat(chatInput); }}
+                        placeholder="✨ Try: 'Deploy a token named AGGG with supply 1,000,000' or click a suggestion above..."
+                        className="input"
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <button className="button" onClick={() => sendChat(chatInput)} disabled={chatLoading}>{chatLoading ? 'Thinking…' : 'Send'}</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {selectedTab === 'solidity' ? (
