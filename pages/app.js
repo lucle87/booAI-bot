@@ -208,22 +208,53 @@ export default function App() {
 
       addMessage('ai', `⏳ Payment confirmed! Executing task...\n💳 Tx: \`${txHash.slice(0,20)}...\``)
 
-      setTimeout(() => {
+      // Call generate API for media tasks
+      const mediaTasks = ['TEXT_TO_IMAGE', 'TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'TEXT_TO_MUSIC']
+      
+      if (mediaTasks.includes(task?.taskType)) {
+        addMessage('ai', '🎨 Generating your content... This may take 30-60 seconds...')
+        try {
+          const genRes = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskType: task.taskType, params: task.params })
+          })
+          const genData = await genRes.json()
+
+          if (genData.error) {
+            addMessage('ai', `❌ Generation failed: ${genData.error}\n\nPayment Tx: \`${txHash}\``, { type: 'success' })
+          } else {
+            addMessage('ai',
+              `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
+              { type: 'success', mediaUrl: genData.url, mediaType: genData.type }
+            )
+          }
+        } catch (genErr) {
+          addMessage('ai', `✅ Payment done but generation failed: ${genErr.message}`, { type: 'success' })
+        }
+      } else {
+        // Contract deploy
         const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
         addMessage('ai',
-          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/${txHash}`,
+          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
           { type: 'success' }
         )
-        setTaskHistory(prev => [{
+      }
+
+      setTaskHistory(prev => {
+        const newHistory = [{
           icon: getTaskIcon(task?.taskType),
           name: task?.taskName || 'Task',
           fee: '0.1 USDC',
           status: 'done',
           time: now(),
-        }, ...prev])
-        setPendingTask(null)
-        pendingTaskRef.current = null
-      }, 3000)
+          txHash: txHash,
+        }, ...prev].slice(0, 20)
+        localStorage.setItem('booai_task_history', JSON.stringify(newHistory))
+        return newHistory
+      })
+      setPendingTask(null)
+      pendingTaskRef.current = null
 
     } catch (err) {
       if (err.code === 4001 || err.message?.includes('rejected')) {
@@ -442,6 +473,24 @@ export default function App() {
                         .replace(/`(.*?)`/g, '<code>$1</code>')
                         .replace(/\n/g, '<br/>')
                     }} />
+                    {m.mediaUrl && m.mediaType === 'image' && (
+                      <div style={{marginTop:10}}>
+                        <img src={m.mediaUrl} alt="Generated" style={{maxWidth:'100%', borderRadius:8, display:'block'}} />
+                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Open full size</a>
+                      </div>
+                    )}
+                    {m.mediaUrl && m.mediaType === 'video' && (
+                      <div style={{marginTop:10}}>
+                        <video src={m.mediaUrl} controls style={{maxWidth:'100%', borderRadius:8, display:'block'}} />
+                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Download video</a>
+                      </div>
+                    )}
+                    {m.mediaUrl && m.mediaType === 'audio' && (
+                      <div style={{marginTop:10}}>
+                        <audio src={m.mediaUrl} controls style={{width:'100%'}} />
+                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Download audio</a>
+                      </div>
+                    )}
                   </div>
                   <div className="msg-time">{m.time}</div>
                 </div>
