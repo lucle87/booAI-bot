@@ -91,7 +91,13 @@ RULES:
 - Ask ONE parameter at a time
 - Be friendly and helpful
 - When you have ALL required parameters, output ONLY raw JSON (no markdown, no backticks)
-
+IMPORTANT: When user has attached an image file and wants to animate/convert it to video:
+- taskType must be "IMAGE_TO_VIDEO"  
+- Do NOT include video URL or output in the JSON
+- The system will handle the actual generation
+- Just collect: duration, style parameters
+- Then output the ready JSON immediately
+- Never simulate or fake the output
 WHEN READY output ONLY this JSON:
 {"ready":true,"taskType":"DEPLOY_ERC20","taskName":"Deploy ERC20: MOON","params":{"name":"Moon","symbol":"MOON","totalSupply":"1000000","decimals":18},"summary":"I will deploy MOON token with 1M supply for 0.1 USDC","solidityCode":"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.20;\\ncontract Moon { string public name='Moon'; string public symbol='MOON'; uint256 public totalSupply=1000000*10**18; mapping(address=>uint256) public balanceOf; constructor(){balanceOf[msg.sender]=totalSupply;} }"}`
 
