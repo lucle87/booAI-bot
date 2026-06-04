@@ -10,7 +10,13 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [taskHistory, setTaskHistory] = useState([])
+  const [taskHistory, setTaskHistory] = useState(() => {
+  if (typeof window === 'undefined') return []
+  try {
+    const saved = localStorage.getItem('booai_task_history')
+    return saved ? JSON.parse(saved) : []
+  } catch { return [] }
+})
   const [showPayModal, setShowPayModal] = useState(false)
   const [pendingTask, setPendingTask] = useState(null)
   const [conversationHistory, setConversationHistory] = useState([])
