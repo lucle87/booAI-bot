@@ -1,4 +1,7 @@
 // pages/api/generate.js — Hugging Face Inference API
+export const config = {
+  maxDuration: 60,
+}
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -18,7 +21,7 @@ export default async function handler(req, res) {
       const fullPrompt = style ? `${prompt}, ${style} style, high quality` : `${prompt}, high quality`
 
       const response = await fetch(
-        'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0',
+        'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5',
         {
           method: 'POST',
           headers: {
