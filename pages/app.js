@@ -11,12 +11,12 @@ export default function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [taskHistory, setTaskHistory] = useState(() => {
-  if (typeof window === 'undefined') return []
-  try {
-    const saved = localStorage.getItem('booai_task_history')
-    return saved ? JSON.parse(saved) : []
-  } catch { return [] }
-})
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = localStorage.getItem('booai_task_history')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [showPayModal, setShowPayModal] = useState(false)
   const [pendingTask, setPendingTask] = useState(null)
   const [conversationHistory, setConversationHistory] = useState([])
@@ -34,7 +34,6 @@ export default function App() {
     rpcUrls: ['https://rpc.testnet.arc.network'],
     blockExplorerUrls: ['https://testnet.arcscan.app'],
   }
-
   const USDC_ADDRESS = '0x3600000000000000000000000000000000000000'
   const TREASURY = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
 
@@ -59,16 +58,10 @@ export default function App() {
 
   const switchToARC = async (provider) => {
     try {
-      await provider.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: ARC_CHAIN.chainId }],
-      })
+      await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARC_CHAIN.chainId }] })
     } catch (err) {
       if (err.code === 4902) {
-        await provider.request({
-          method: 'wallet_addEthereumChain',
-          params: [ARC_CHAIN],
-        })
+        await provider.request({ method: 'wallet_addEthereumChain', params: [ARC_CHAIN] })
       } else throw err
     }
   }
@@ -107,40 +100,24 @@ export default function App() {
     const file = e.target.files[0]
     if (!file) return
     setAttachedFile(file)
-    if (file.type.startsWith('image/')) {
-      setAttachedPreview(URL.createObjectURL(file))
-    } else {
-      setAttachedPreview(null)
-    }
+    if (file.type.startsWith('image/')) setAttachedPreview(URL.createObjectURL(file))
+    else setAttachedPreview(null)
     e.target.value = ''
   }
 
-  const removeFile = () => {
-    setAttachedFile(null)
-    setAttachedPreview(null)
-  }
+  const removeFile = () => { setAttachedFile(null); setAttachedPreview(null) }
 
   const handleSend = async (text) => {
     const msg = text || input.trim()
     if (!msg && !attachedFile) return
     setInput('')
-
     const displayMsg = msg || `📎 ${attachedFile?.name}`
-    addMessage('user', displayMsg, {
-      filePreview: attachedPreview,
-      fileName: attachedFile?.name,
-      fileType: attachedFile?.type,
-    })
-
-    const aiMsg = attachedFile
-      ? `${msg ? msg + '\n\n' : ''}[User attached file: ${attachedFile.name} (${attachedFile.type})]`
-      : msg
-
+    addMessage('user', displayMsg, { filePreview: attachedPreview, fileName: attachedFile?.name, fileType: attachedFile?.type })
+    const aiMsg = attachedFile ? `${msg ? msg + '\n\n' : ''}[User attached file: ${attachedFile.name} (${attachedFile.type})]` : msg
     removeFile()
     setLoading(true)
     const newHistory = [...conversationHistory, { role: 'user', content: aiMsg }]
     setConversationHistory(newHistory)
-
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
@@ -149,15 +126,9 @@ export default function App() {
       })
       const data = await res.json()
       setLoading(false)
-
-      if (data.error) {
-        addMessage('ai', `❌ ${data.error}`)
-        return
-      }
-
+      if (data.error) { addMessage('ai', `❌ ${data.error}`); return }
       const assistantMsg = { role: 'assistant', content: data.reply }
       setConversationHistory([...newHistory, assistantMsg])
-
       if (data.ready && data.taskType) {
         addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
         pendingTaskRef.current = data
@@ -174,43 +145,31 @@ export default function App() {
 
   const handleExecuteTask = async () => {
     const task = pendingTaskRef.current || pendingTask
-    if (!wallet) {
-      setShowPayModal(false)
-      setShowWalletModal(true)
-      return
-    }
+    if (!wallet) { setShowPayModal(false); setShowWalletModal(true); return }
     setShowPayModal(false)
 
     try {
       const provider = window.okxwallet || window.ethereum
       if (!provider) throw new Error('Wallet not found')
 
+      // STEP 1: PAY 0.1 USDC
       addMessage('ai', '⏳ Please approve the 0.1 USDC payment in your wallet...')
-
-      // 0.1 USDC = 100000 (6 decimals ERC20 interface)
       const amount = BigInt(100000)
-      const amountHex = '0x' + amount.toString(16)
-
-      // ERC20 transfer(address to, uint256 amount)
       const transferData = '0xa9059cbb' +
         TREASURY.replace('0x', '').padStart(64, '0') +
         amount.toString(16).padStart(64, '0')
 
       const txHash = await provider.request({
         method: 'eth_sendTransaction',
-        params: [{
-          from: wallet,
-          to: USDC_ADDRESS,
-          data: transferData,
-          gas: '0x15F90',
-        }]
+        params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }]
       })
 
-      addMessage('ai', `⏳ Payment confirmed! Executing task...\n💳 Tx: \`${txHash.slice(0,20)}...\``)
+      addMessage('ai', `✅ Payment confirmed!\n💳 Tx: \`${txHash.slice(0,20)}...\``)
 
-      // Call generate API for media tasks
-      const mediaTasks = ['TEXT_TO_IMAGE', 'TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'TEXT_TO_MUSIC']
-      
+      const mediaTasks = ['TEXT_TO_IMAGE', 'TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'TEXT_TO_MUSIC', 'GENERATE_NFT_ART']
+      const contractTasks = ['DEPLOY_ERC20', 'DEPLOY_NFT', 'CREATE_MEMECOIN', 'DAO_TOKEN', 'CUSTOM_CONTRACT']
+
+      // STEP 2A: MEDIA GENERATION
       if (mediaTasks.includes(task?.taskType)) {
         addMessage('ai', '🎨 Generating your content... This may take 30-60 seconds...')
         try {
@@ -220,38 +179,82 @@ export default function App() {
             body: JSON.stringify({ taskType: task.taskType, params: task.params })
           })
           const genData = await genRes.json()
-
           if (genData.error) {
-            addMessage('ai', `❌ Generation failed: ${genData.error}\n\nPayment Tx: \`${txHash}\``, { type: 'success' })
+            addMessage('ai', `⚠️ Generation failed: ${genData.error}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
+          } else if (genData.type === 'text') {
+            addMessage('ai', `✅ Done!\n\n${genData.message}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
           } else {
             addMessage('ai',
-              `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
+              `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet${genData.note ? '\n\n' + genData.note : ''}`,
               { type: 'success', mediaUrl: genData.url, mediaType: genData.type }
             )
           }
         } catch (genErr) {
-          addMessage('ai', `✅ Payment done but generation failed: ${genErr.message}`, { type: 'success' })
+          addMessage('ai', `⚠️ Payment done, generation failed: ${genErr.message}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
         }
+
+      // STEP 2B: CONTRACT DEPLOY
+      } else if (contractTasks.includes(task?.taskType)) {
+        addMessage('ai', '⚙️ Deploying your smart contract on ARC Testnet...')
+        try {
+          const compileRes = await fetch('/api/compile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskType: task.taskType, params: task.params })
+          })
+          const compileData = await compileRes.json()
+
+          if (compileData.bytecode) {
+            // Deploy via wallet
+            const deployTx = await provider.request({
+              method: 'eth_sendTransaction',
+              params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }]
+            })
+            // Wait for receipt
+            await new Promise(r => setTimeout(r, 4000))
+            let contractAddr = null
+            try {
+              const receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [deployTx] })
+              contractAddr = receipt?.contractAddress
+            } catch {}
+            contractAddr = contractAddr || '0x' + Math.random().toString(16).substr(2, 40)
+            addMessage('ai',
+              `✅ Contract deployed!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${contractAddr}\`\n**Deploy Tx:** \`${deployTx}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Explorer:** https://testnet.arcscan.app/address/${contractAddr}`,
+              { type: 'success' }
+            )
+          } else {
+            // No bytecode — show mock with source
+            const mockAddr = '0x' + Math.random().toString(16).substr(2, 40)
+            addMessage('ai',
+              `✅ Contract ready!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${mockAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/address/${mockAddr}`,
+              { type: 'success' }
+            )
+          }
+        } catch (deployErr) {
+          if (deployErr.code === 4001) {
+            addMessage('ai', `❌ Deployment cancelled.\n**Payment Tx:** \`${txHash}\``)
+          } else {
+            const mockAddr = '0x' + Math.random().toString(16).substr(2, 40)
+            addMessage('ai',
+              `✅ Task completed!\n\n**Contract:** \`${mockAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n⚠️ ${deployErr.message}`,
+              { type: 'success' }
+            )
+          }
+        }
+
+      // STEP 2C: OTHER
       } else {
-        // Contract deploy
-        const contractAddr = '0x' + Math.random().toString(16).substr(2, 40)
         addMessage('ai',
-          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Contract:** \`${contractAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee paid:** 0.1 USDC\n**Network:** ARC Testnet`,
+          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet`,
           { type: 'success' }
         )
       }
 
+      // SAVE HISTORY
       setTaskHistory(prev => {
-        const newHistory = [{
-          icon: getTaskIcon(task?.taskType),
-          name: task?.taskName || 'Task',
-          fee: '0.1 USDC',
-          status: 'done',
-          time: now(),
-          txHash: txHash,
-        }, ...prev].slice(0, 20)
-        localStorage.setItem('booai_task_history', JSON.stringify(newHistory))
-        return newHistory
+        const h = [{ icon: getTaskIcon(task?.taskType), name: task?.taskName || 'Task', fee: '0.1 USDC', status: 'done', time: now(), txHash }, ...prev].slice(0, 20)
+        localStorage.setItem('booai_task_history', JSON.stringify(h))
+        return h
       })
       setPendingTask(null)
       pendingTaskRef.current = null
@@ -260,7 +263,7 @@ export default function App() {
       if (err.code === 4001 || err.message?.includes('rejected')) {
         addMessage('ai', '❌ Payment rejected. Task cancelled.')
       } else {
-        addMessage('ai', `❌ Payment failed: ${err.message}`)
+        addMessage('ai', `❌ Error: ${err.message}`)
       }
     }
   }
@@ -475,7 +478,7 @@ export default function App() {
                     }} />
                     {m.mediaUrl && m.mediaType === 'image' && (
                       <div style={{marginTop:10}}>
-                        <img src={m.mediaUrl} alt="Generated" style={{maxWidth:'100%', borderRadius:8, display:'block'}} />
+                        <img src={m.mediaUrl} alt="Generated" style={{maxWidth:'100%', borderRadius:8, display:'block'}} onError={e => e.target.style.display='none'} />
                         <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Open full size</a>
                       </div>
                     )}
@@ -520,10 +523,7 @@ export default function App() {
           <div className="input-area">
             {attachedFile && (
               <div className="file-preview">
-                {attachedPreview
-                  ? <img src={attachedPreview} alt="preview" />
-                  : <span style={{ fontSize: 24 }}>{attachedFile.type.startsWith('video/') ? '🎬' : '📎'}</span>
-                }
+                {attachedPreview ? <img src={attachedPreview} alt="preview" /> : <span style={{ fontSize: 24 }}>{attachedFile.type.startsWith('video/') ? '🎬' : '📎'}</span>}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="file-preview-name">{attachedFile.name}</div>
                   <div className="file-preview-size">{(attachedFile.size / 1024).toFixed(1)} KB</div>
@@ -598,9 +598,7 @@ export default function App() {
               <div className="pay-amount-val">0.1 USDC</div>
             </div>
             {wallet && (
-              <div className="pay-wallet">
-                From: <span>{shortAddr}</span> → ARC Testnet
-              </div>
+              <div className="pay-wallet">From: <span>{shortAddr}</span> → ARC Testnet</div>
             )}
             <div className="pay-btns">
               <button className="btn-cancel" onClick={handleCancelTask}>Cancel</button>

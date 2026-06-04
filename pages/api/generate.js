@@ -50,9 +50,11 @@ export default async function handler(req, res) {
       })
 
       if (!createRes.ok) {
-        const err = await createRes.text()
-        throw new Error(`Horde submit error: ${err}`)
-      }
+        const errText = await createRes.text()
+        let errMsg = errText
+        try { errMsg = JSON.parse(errText)?.message || errText } catch {}
+        throw new Error(`Horde error: ${errMsg}`)
+        }
 
       const { id } = await createRes.json()
       if (!id) throw new Error('No generation ID returned')
