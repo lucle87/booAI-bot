@@ -8,24 +8,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Hugging Face API key not configured.' })
   }
 
+  const HF_KEY = process.env.HUGGINGFACE_API_KEY
+
   try {
+    // ===== TEXT TO IMAGE =====
     if (taskType === 'TEXT_TO_IMAGE' || taskType === 'GENERATE_NFT_ART') {
       const prompt = params.description || params.prompt || 'a beautiful artwork'
       const style = params.style || ''
-      const fullPrompt = style ? `${prompt}, ${style} style` : prompt
+      const fullPrompt = style ? `${prompt}, ${style} style, high quality` : `${prompt}, high quality`
 
       const response = await fetch(
         'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0',
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            'Authorization': `Bearer ${HF_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             inputs: fullPrompt,
             parameters: {
-              negative_prompt: 'blurry, bad quality, ugly, deformed',
+              negative_prompt: 'blurry, bad quality, ugly, deformed, watermark',
               num_inference_steps: 25,
               guidance_scale: 7.5,
             }
@@ -33,81 +36,124 @@ export default async function handler(req, res) {
         }
       )
 
+      if (response.status === 503) {
+        return res.status(200).json({ error: 'Model is loading, please try again in 20 seconds.' })
+      }
       if (!response.ok) {
         const err = await response.text()
-        // Model loading
-        if (response.status === 503) {
-          return res.status(200).json({ 
-            error: 'Model is loading, please try again in 20 seconds.' 
-          })
-        }
-        throw new Error(err || `HF error: ${response.status}`)
+        throw new Error(`Image generation failed: ${err}`)
       }
 
-      // Response is image binary
-      const imageBuffer = await response.arrayBuffer()
-      const base64 = Buffer.from(imageBuffer).toString('base64')
-      const imageUrl = `data:image/jpeg;base64,${base64}`
-
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
       return res.status(200).json({
         type: 'image',
-        url: imageUrl,
+        url: `data:image/jpeg;base64,${base64}`,
         prompt: fullPrompt,
       })
     }
 
-    if (taskType === 'TEXT_TO_VIDEO') {
-      // HF doesn't have great free video, use image as fallback
-      const prompt = params.description || params.prompt || 'a beautiful scene'
-      
+    // ===== IMAGE TO VIDEO (animate image) =====
+    if (taskType === 'IMAGE_TO_VIDEO') {
+      const style = params.style || 'anime'
+      const duration = params.duration || 5
+      const imageDesc = params.imageDescription || 'the attached image'
+
+      // Generate animated version using SDXL with motion prompt
+      const animPrompt = `${imageDesc}, ${style} style, dynamic motion, animated scene, cinematic, smooth animation, high quality`
+
       const response = await fetch(
         'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0',
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            'Authorization': `Bearer ${HF_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            inputs: prompt + ', cinematic, movie still, high quality',
-            parameters: { num_inference_steps: 25 }
+            inputs: animPrompt,
+            parameters: {
+              negative_prompt: 'static, blurry, bad quality, ugly',
+              num_inference_steps: 30,
+              guidance_scale: 8,
+            }
           }),
         }
       )
 
+      if (response.status === 503) {
+        return res.status(200).json({ error: 'Model is loading, please try again in 20 seconds.' })
+      }
       if (!response.ok) {
         const err = await response.text()
-        throw new Error(err || `HF error: ${response.status}`)
+        throw new Error(`Generation failed: ${err}`)
       }
 
-      const imageBuffer = await response.arrayBuffer()
-      const base64 = Buffer.from(imageBuffer).toString('base64')
-      const imageUrl = `data:image/jpeg;base64,${base64}`
-
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
       return res.status(200).json({
         type: 'image',
-        url: imageUrl,
-        note: 'Video generation preview (cinematic image)',
-        prompt,
+        url: `data:image/jpeg;base64,${base64}`,
+        note: `🎬 Animated style preview (${duration}s ${style} video) — Full video generation coming soon!`,
+        prompt: animPrompt,
       })
     }
 
-    if (taskType === 'IMAGE_TO_VIDEO') {
+    // ===== TEXT TO VIDEO =====
+    if (taskType === 'TEXT_TO_VIDEO') {
+      const prompt = params.description || params.prompt || 'a beautiful cinematic scene'
+      const style = params.style || 'cinematic'
+      const fullPrompt = `${prompt}, ${style}, high quality, detailed, dramatic lighting`
+
+      const response = await fetch(
+        'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${HF_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: fullPrompt,
+            parameters: {
+              negative_prompt: 'blurry, bad quality, static, boring',
+              num_inference_steps: 25,
+              guidance_scale: 7.5,
+            }
+          }),
+        }
+      )
+
+      if (response.status === 503) {
+        return res.status(200).json({ error: 'Model is loading, please try again in 20 seconds.' })
+      }
+      if (!response.ok) {
+        const err = await response.text()
+        throw new Error(`Generation failed: ${err}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
       return res.status(200).json({
-        type: 'text',
-        message: 'Image to video generation coming soon! Your payment has been recorded.',
+        type: 'image',
+        url: `data:image/jpeg;base64,${base64}`,
+        note: '🎬 Video storyboard preview — Full video generation coming soon!',
+        prompt: fullPrompt,
       })
     }
 
+    // ===== TEXT TO MUSIC =====
     if (taskType === 'TEXT_TO_MUSIC') {
-      const prompt = `${params.genre || 'electronic'} ${params.mood || 'upbeat'} music`
-      
+      const genre = params.genre || 'electronic'
+      const mood = params.mood || 'upbeat'
+      const prompt = `${genre} ${mood} music, high quality`
+
       const response = await fetch(
         'https://api-inference.huggingface.co/models/facebook/musicgen-small',
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            'Authorization': `Bearer ${HF_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -117,29 +163,28 @@ export default async function handler(req, res) {
         }
       )
 
+      if (response.status === 503) {
+        return res.status(200).json({ error: 'Music model loading, try again in 30 seconds.' })
+      }
       if (!response.ok) {
         const err = await response.text()
-        if (response.status === 503) {
-          return res.status(200).json({ error: 'Music model loading, try again in 30 seconds.' })
-        }
-        throw new Error(err || `HF error: ${response.status}`)
+        throw new Error(`Music generation failed: ${err}`)
       }
 
-      const audioBuffer = await response.arrayBuffer()
-      const base64 = Buffer.from(audioBuffer).toString('base64')
-      const audioUrl = `data:audio/wav;base64,${base64}`
-
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
       return res.status(200).json({
         type: 'audio',
-        url: audioUrl,
+        url: `data:audio/wav;base64,${base64}`,
         prompt,
       })
     }
 
-    return res.status(400).json({ error: `Unsupported task: ${taskType}` })
+    // ===== FALLBACK =====
+    return res.status(400).json({ error: `Unsupported task type: ${taskType}` })
 
   } catch (error) {
     console.error('Generate error:', error.message)
-    return res.status(500).json({ error: error.message || 'Generation failed' })
+    return res.status(500).json({ error: error.message || 'Generation failed. Please try again.' })
   }
 }
