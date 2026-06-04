@@ -1,4 +1,4 @@
-// pages/api/generate.js — Pollinations AI (free, no API key, instant)
+// pages/api/generate.js — Pollinations AI (free, instant, no API key)
 export const config = {
   maxDuration: 60,
 }
@@ -9,32 +9,51 @@ export default async function handler(req, res) {
   const { taskType, params } = req.body
 
   try {
+
     // ===== TEXT TO IMAGE =====
-    if (taskType === 'TEXT_TO_IMAGE' || taskType === 'GENERATE_NFT_ART' || taskType === 'IMAGE_TO_VIDEO' || taskType === 'TEXT_TO_VIDEO') {
-      const prompt = params.description || params.prompt || params.imageDescription || 'a beautiful artwork'
+    if (taskType === 'TEXT_TO_IMAGE' || taskType === 'GENERATE_NFT_ART') {
+      const prompt = params.description || params.prompt || 'a beautiful artwork'
       const style = params.style || ''
-      const fullPrompt = style ? `${prompt}, ${style} style` : prompt
-
-      // Pollinations AI — free, instant, no API key needed
-      const encodedPrompt = encodeURIComponent(fullPrompt)
-      const seed = Math.floor(Math.random() * 1000000)
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`
-
-      // Fetch and convert to base64 to avoid CORS
-      const response = await fetch(imageUrl)
-      if (!response.ok) throw new Error('Image generation failed')
-
-      const buffer = await response.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString('base64')
-      const contentType = response.headers.get('content-type') || 'image/jpeg'
+      const fullPrompt = style ? `${prompt}, ${style} style, high quality` : `${prompt}, high quality`
+      const seed = Math.floor(Math.random() * 999999)
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`
 
       return res.status(200).json({
         type: 'image',
-        url: `data:${contentType};base64,${base64}`,
-        directUrl: imageUrl,
+        url,
         prompt: fullPrompt,
-        note: taskType === 'IMAGE_TO_VIDEO' ? '🎬 Animated style preview' :
-              taskType === 'TEXT_TO_VIDEO' ? '🎬 Video storyboard preview' : null
+      })
+    }
+
+    // ===== IMAGE TO VIDEO (animated style) =====
+    if (taskType === 'IMAGE_TO_VIDEO') {
+      const desc = params.imageDescription || 'an image'
+      const style = params.style || 'anime'
+      const fullPrompt = `${desc}, ${style} style, dynamic motion, animated, cinematic, high quality`
+      const seed = Math.floor(Math.random() * 999999)
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=576&seed=${seed}&nologo=true&enhance=true`
+
+      return res.status(200).json({
+        type: 'image',
+        url,
+        prompt: fullPrompt,
+        note: '🎬 Animated style preview — Full video coming soon!',
+      })
+    }
+
+    // ===== TEXT TO VIDEO =====
+    if (taskType === 'TEXT_TO_VIDEO') {
+      const prompt = params.description || params.prompt || 'a cinematic scene'
+      const style = params.style || 'cinematic'
+      const fullPrompt = `${prompt}, ${style}, movie still, dramatic lighting, high quality`
+      const seed = Math.floor(Math.random() * 999999)
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&seed=${seed}&nologo=true&enhance=true`
+
+      return res.status(200).json({
+        type: 'image',
+        url,
+        prompt: fullPrompt,
+        note: '🎬 Video storyboard preview — Full video coming soon!',
       })
     }
 
@@ -43,11 +62,11 @@ export default async function handler(req, res) {
       if (!process.env.HUGGINGFACE_API_KEY) {
         return res.status(200).json({
           type: 'text',
-          message: `🎵 Music generation requires Hugging Face API. Your task has been recorded.\n\nGenre: ${params.genre}\nMood: ${params.mood}`,
+          message: `🎵 Music task recorded!\n\nGenre: ${params.genre || 'electronic'}\nMood: ${params.mood || 'upbeat'}\n\nMusic generation API coming soon!`,
         })
       }
 
-      const prompt = `${params.genre || 'electronic'} ${params.mood || 'upbeat'} music`
+      const prompt = `${params.genre || 'electronic'} ${params.mood || 'upbeat'} music, high quality`
       const response = await fetch(
         'https://api-inference.huggingface.co/models/facebook/musicgen-small',
         {
