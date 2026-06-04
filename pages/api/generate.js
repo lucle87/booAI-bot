@@ -12,7 +12,9 @@ export default async function handler(req, res) {
     if (taskType === 'TEXT_TO_IMAGE' || taskType === 'GENERATE_NFT_ART' || taskType === 'IMAGE_TO_VIDEO' || taskType === 'TEXT_TO_VIDEO') {
       const prompt = params.description || params.prompt || params.imageDescription || 'a beautiful artwork'
       const style = params.style || ''
-      const fullPrompt = style ? `${prompt}, ${style} style, high quality, detailed` : `${prompt}, high quality, detailed`
+      const fullPrompt = style 
+  ? `${prompt}, ${style} style, high quality, detailed, realistic, photorealistic` 
+  : `${prompt}, high quality, detailed, realistic, photorealistic`
 
       // Stable Horde - free community GPU, no rate limit
       const createRes = await fetch('https://stablehorde.net/api/v2/generate/async', {
@@ -22,7 +24,7 @@ export default async function handler(req, res) {
           'apikey': '0000000000', // anonymous key
         },
         body: JSON.stringify({
-          prompt: fullPrompt,
+          prompt: fullPrompt + ' ### abstract, surreal, distorted, ugly, bad anatomy, flowers, landscape',
           params: {
             sampler_name: 'k_euler',
             cfg_scale: 7,
