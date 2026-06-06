@@ -26,6 +26,10 @@ export default function App() {
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
   const pendingTaskRef = useRef(null)
+  const [showEmailWallet, setShowEmailWallet] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [sendAmount, setSendAmount] = useState('')
+  const [sending, setSending] = useState(false)
 
   const ARC_CHAIN = {
     chainId: '0x4cef52',
@@ -477,6 +481,13 @@ export default function App() {
           </div>
           <div className="sidebar-bottom">
             <button className="back-btn" onClick={() => router.push('/')}>← Back to home</button>
+            <div style={{marginBottom:10}}>
+              <button
+                onClick={() => setShowEmailWallet(true)}
+                style={{width:'100%',background:'rgba(139,111,255,0.1)',border:'1px solid rgba(139,111,255,0.3)',borderRadius:8,padding:'10px',color:'#8b6fff',fontSize:12,cursor:'pointer',fontFamily:'Inter,sans-serif',marginBottom:6,transition:'all 0.2s'}}
+              >💌 Email Wallet</button>
+              <div style={{fontSize:10,color:'#3a3a52',fontFamily:'Space Mono,monospace',lineHeight:1.5}}>Send USDC to anyone via email address. No MetaMask needed on receiving end.</div>
+            </div>
             <a href="https://faucet.circle.com" target="_blank" rel="noreferrer" className="faucet-link">💧 Get testnet USDC</a>
           </div>
         </div>
@@ -643,6 +654,74 @@ export default function App() {
           </div>
         </div>
       )}
+      {showEmailWallet && (
+        <div className="modal-overlay" onClick={() => setShowEmailWallet(false)}>
+          <div style={{background:'#0d0d1a',border:'1px solid rgba(255,255,255,0.1)',borderRadius:16,padding:32,width:460,maxWidth:'90vw'}} onClick={e => e.stopPropagation()}>
+            <div style={{fontFamily:'Space Grotesk,sans-serif',fontSize:18,fontWeight:700,marginBottom:4}}>💌 Email Wallet</div>
+            <div style={{fontSize:13,color:'#52526a',marginBottom:24,lineHeight:1.6}}>
+              Send USDC to anyone using just their email address.<br/>Uses your connected wallet to sign the transaction.
+            </div>
+
+            {!wallet ? (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:40,marginBottom:16}}>🔗</div>
+                <div style={{fontSize:15,color:'#eeeef5',fontWeight:500,marginBottom:8}}>Connect Wallet First</div>
+                <div style={{fontSize:13,color:'#52526a',marginBottom:24}}>You need to connect MetaMask or OKX wallet to send USDC.</div>
+                <button onClick={() => { setShowEmailWallet(false); setShowWalletModal(true) }}
+                  style={{background:'#8b6fff',color:'#fff',border:'none',borderRadius:10,padding:'12px 32px',fontSize:14,fontWeight:500,cursor:'pointer',width:'100%'}}>
+                  Connect Wallet →
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{background:'rgba(0,212,170,0.06)',border:'1px solid rgba(0,212,170,0.15)',borderRadius:10,padding:14,marginBottom:20}}>
+                  <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:4}}>SENDING FROM</div>
+                  <div style={{fontSize:13,color:'#00d4aa',fontFamily:'Space Mono,monospace'}}>{shortAddr} · ARC Testnet</div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:6}}>SEND TO EMAIL</div>
+                  <input value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@email.com"
+                    style={{width:'100%',background:'#06060f',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'10px 14px',color:'#eeeef5',fontSize:13,boxSizing:'border-box',outline:'none'}} />
+                  <div style={{fontSize:10,color:'#3a3a52',marginTop:4}}>Recipient must have registered their wallet address</div>
+                </div>
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:6}}>AMOUNT (USDC)</div>
+                  <input value={sendAmount} onChange={e => setSendAmount(e.target.value)} placeholder="0.00" type="number" min="0" step="0.1"
+                    style={{width:'100%',background:'#06060f',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'10px 14px',color:'#eeeef5',fontSize:20,fontFamily:'Space Grotesk,sans-serif',boxSizing:'border-box',outline:'none'}} />
+                </div>
+                <div style={{background:'rgba(139,111,255,0.06)',border:'1px solid rgba(139,111,255,0.15)',borderRadius:8,padding:'12px 14px',marginBottom:20}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{fontSize:12,color:'#52526a'}}>Amount</span>
+                    <span style={{fontSize:12,color:'#eeeef5'}}>{sendAmount || '0.00'} USDC</span>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{fontSize:12,color:'#52526a'}}>Network fee</span>
+                    <span style={{fontSize:12,color:'#eeeef5'}}>~0.01 USDC</span>
+                  </div>
+                  <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:8,marginTop:4,display:'flex',justifyContent:'space-between'}}>
+                    <span style={{fontSize:12,fontWeight:500,color:'#eeeef5'}}>Total</span>
+                    <span style={{fontSize:12,fontWeight:500,color:'#00d4aa'}}>{sendAmount ? (parseFloat(sendAmount)+0.01).toFixed(2) : '0.01'} USDC</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:10}}>
+                  <button onClick={() => setShowEmailWallet(false)}
+                    style={{flex:1,padding:12,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,color:'#52526a',fontSize:14,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+                    Cancel
+                  </button>
+                  <button onClick={handleEmailSend} disabled={sending||!emailTo||!sendAmount}
+                    style={{flex:2,padding:12,background:'#8b6fff',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:500,cursor:'pointer',fontFamily:'Inter,sans-serif',opacity:(sending||!emailTo||!sendAmount)?0.5:1}}>
+                    {sending ? '⏳ Sending...' : '💸 Send USDC →'}
+                  </button>
+                </div>
+                <div style={{fontSize:10,color:'#3a3a52',textAlign:'center',marginTop:12,fontFamily:'Space Mono,monospace'}}>
+                  ARC Testnet · USDC Native · No extra fees
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </>
   )
 }
