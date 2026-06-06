@@ -17,7 +17,7 @@ export default function App({ Component, pageProps }) {
         />
       </Head>
       <PrivyProvider
-        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID}
+        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'placeholder-id'}
         config={{
           loginMethods: ['email'],
           appearance: {
