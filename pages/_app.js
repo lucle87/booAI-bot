@@ -4,6 +4,8 @@ import Head from 'next/head'
 import { PrivyProvider } from '@privy-io/react-auth'
 
 export default function App({ Component, pageProps }) {
+  const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'cmq0yf8yi003n0cl82yux6e3y'
+
   return (
     <>
       <Head>
@@ -11,13 +13,9 @@ export default function App({ Component, pageProps }) {
         <meta name="description" content="Deploy contracts, generate media, mint NFTs — all in one AI chat." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap"
-          rel="stylesheet"
-        />
       </Head>
       <PrivyProvider
-        appId="cmq0yf8yi003n0cl82yux6e3y"
+        appId={privyAppId}
         config={{
           loginMethods: ['email'],
           appearance: {
