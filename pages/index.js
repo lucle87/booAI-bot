@@ -386,7 +386,99 @@ export default function Home() {
           </div>
         </div>
 
-        {/* FAQ */}
+        {/* EMAIL WALLET SECTION */}
+        <div style={{background:'linear-gradient(135deg,rgba(139,111,255,0.08),rgba(0,212,170,0.06))',border:'1px solid rgba(139,111,255,0.2)',borderRadius:20,padding:'48px',marginBottom:64,textAlign:'center'}}>
+          <div style={{fontFamily:'Space Mono,monospace',fontSize:11,color:'#00d4aa',letterSpacing:'0.1em',marginBottom:12}}>// EMAIL WALLET · NEW FEATURE</div>
+          <h2 style={{fontFamily:'Space Grotesk,sans-serif',fontSize:'clamp(24px,3vw,36px)',fontWeight:700,color:'#eeeef5',marginBottom:12}}>Send USDC with just an email</h2>
+          <p style={{fontSize:15,color:'#52526a',marginBottom:32,maxWidth:520,margin:'0 auto 32px',lineHeight:1.7}}>
+            No MetaMask needed on the receiving end. Create a wallet from your email address and send USDC to anyone on ARC Testnet — just like sending an email.
+          </p>
+
+          <div style={{display:'flex',justifyContent:'center',gap:32,marginBottom:32,flexWrap:'wrap'}}>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>💌</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Email Address</div>
+              <div style={{fontSize:12,color:'#52526a'}}>Your identity & wallet</div>
+            </div>
+            <div style={{textAlign:'center',display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>💸</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Send USDC</div>
+              <div style={{fontSize:12,color:'#52526a'}}>Instant on ARC Testnet</div>
+            </div>
+            <div style={{textAlign:'center',display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>✅</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Received</div>
+              <div style={{fontSize:12,color:'#52526a'}}>No extension needed</div>
+            </div>
+          </div>
+
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
+            <button
+              onClick={() => router.push('/app')}
+              style={{background:'#8b6fff',color:'#fff',border:'none',borderRadius:12,padding:'14px 40px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'Space Grotesk,sans-serif',transition:'opacity 0.2s'}}
+              onMouseOver={e=>e.target.style.opacity='0.85'}
+              onMouseOut={e=>e.target.style.opacity='1'}
+            >
+              💌 Open Email Wallet →
+            </button>
+            <div style={{fontSize:12,color:'#3a3a52',fontFamily:'Space Mono,monospace'}}>
+              Open app → click "💌 Email Wallet" in sidebar
+            </div>
+          </div>
+        </div>
+
+        {/* EMAIL WALLET SECTION */}
+        <div style={{background:'linear-gradient(135deg,rgba(139,111,255,0.08),rgba(0,212,170,0.06))',border:'1px solid rgba(139,111,255,0.2)',borderRadius:20,padding:'48px',marginBottom:64,textAlign:'center'}}>
+          <div style={{fontFamily:'Space Mono,monospace',fontSize:11,color:'#00d4aa',letterSpacing:'0.1em',marginBottom:12}}>// EMAIL WALLET · NEW FEATURE</div>
+          <h2 style={{fontFamily:'Space Grotesk,sans-serif',fontSize:'clamp(24px,3vw,36px)',fontWeight:700,color:'#eeeef5',marginBottom:12}}>Send USDC with just an email</h2>
+          <p style={{fontSize:15,color:'#52526a',marginBottom:32,maxWidth:520,margin:'0 auto 32px',lineHeight:1.7}}>
+            No MetaMask needed on the receiving end. Create a wallet from your email and send USDC to anyone on ARC Testnet — just like sending a message.
+          </p>
+          <div style={{display:'flex',justifyContent:'center',gap:32,marginBottom:32,flexWrap:'wrap'}}>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>💌</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Email Address</div>
+              <div style={{fontSize:12,color:'#52526a'}}>Your identity and wallet</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>💸</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Send USDC</div>
+              <div style={{fontSize:12,color:'#52526a'}}>Instant on ARC Testnet</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:28,marginBottom:6}}>✅</div>
+              <div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Received</div>
+              <div style={{fontSize:12,color:'#52526a'}}>No extension needed</div>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/app')}
+            style={{background:'#8b6fff',color:'#fff',border:'none',borderRadius:12,padding:'14px 40px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'Space Grotesk,sans-serif',marginBottom:12}}
+          >💌 Open Email Wallet →</button>
+          <div style={{fontSize:12,color:'#3a3a52',fontFamily:'Space Mono,monospace'}}>Open app → click "💌 Email Wallet" in sidebar</div>
+        </div>
+
+                {/* EMAIL WALLET */}
+        <div style={{background:'linear-gradient(135deg,rgba(139,111,255,0.08),rgba(0,212,170,0.06))',border:'1px solid rgba(139,111,255,0.2)',borderRadius:20,padding:'48px',marginBottom:64,textAlign:'center'}}>
+          <div style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:'#00d4aa',letterSpacing:'0.1em',marginBottom:12}}>// EMAIL WALLET · NEW FEATURE</div>
+          <h2 style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:'clamp(24px,3vw,36px)',fontWeight:700,color:'#eeeef5',marginBottom:12}}>Send USDC with just an email</h2>
+          <p style={{fontSize:15,color:'#52526a',maxWidth:520,margin:'0 auto 32px',lineHeight:1.7}}>No MetaMask needed on the receiving end. Send USDC to anyone on ARC Testnet — just like sending a message.</p>
+          <div style={{display:'flex',justifyContent:'center',gap:32,marginBottom:32,flexWrap:'wrap'}}>
+            <div style={{textAlign:'center'}}><div style={{fontSize:28,marginBottom:6}}>💌</div><div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Email Address</div><div style={{fontSize:12,color:'#52526a'}}>Your identity and wallet</div></div>
+            <div style={{display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}><div style={{fontSize:28,marginBottom:6}}>💸</div><div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Send USDC</div><div style={{fontSize:12,color:'#52526a'}}>Instant on ARC Testnet</div></div>
+            <div style={{display:'flex',alignItems:'center',color:'#3a3a52',fontSize:24}}>→</div>
+            <div style={{textAlign:'center'}}><div style={{fontSize:28,marginBottom:6}}>✅</div><div style={{fontSize:13,fontWeight:500,color:'#eeeef5',marginBottom:4}}>Received</div><div style={{fontSize:12,color:'#52526a'}}>No extension needed</div></div>
+          </div>
+          <button onClick={() => router.push('/app')} style={{background:'#8b6fff',color:'#fff',border:'none',borderRadius:12,padding:'14px 40px',fontSize:15,fontWeight:600,cursor:'pointer',marginBottom:12}}>💌 Open Email Wallet →</button>
+          <div style={{fontSize:12,color:'#3a3a52'}}>Open app → click "💌 Email Wallet" in sidebar</div>
+        </div>
+
+{/* FAQ */}
         <div className="section-tag">// FAQ</div>
         <h2 className="section-title" style={{ marginBottom: 24 }}>Common questions</h2>
         <div className="faq-list">
