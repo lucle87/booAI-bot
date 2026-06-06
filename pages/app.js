@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { usePrivy, useWallets } from '@privy-io/react-auth'
 
 export default function App() {
   const router = useRouter()
@@ -280,25 +279,19 @@ export default function App() {
     if (!emailTo || !sendAmount) return
     setSending(true)
     try {
-      const embeddedWallet = wallets?.find(w => w.walletClientType === 'privy')
-      if (!embeddedWallet) throw new Error('No embedded wallet found')
+      // Use connected MetaMask/OKX wallet to send USDC
+      const provider = window.okxwallet || window.ethereum
+      if (!provider) throw new Error('Please connect your wallet first')
+      if (!wallet) throw new Error('Please connect your wallet first')
 
-      // Get provider from Privy embedded wallet
-      const provider = await embeddedWallet.getEthereumProvider()
-
-      const USDC_ADDRESS = '0x3600000000000000000000000000000000000000'
-      const amount = BigInt(Math.floor(parseFloat(sendAmount) * 1000000)) // 6 decimals
-
-      // For now send to treasury as demo (in production lookup recipient address by email)
-      const DEMO_RECIPIENT = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
-
+      const amount = BigInt(Math.floor(parseFloat(sendAmount) * 1000000))
       const transferData = '0xa9059cbb' +
-        DEMO_RECIPIENT.replace('0x', '').padStart(64, '0') +
+        TREASURY.replace('0x', '').padStart(64, '0') +
         amount.toString(16).padStart(64, '0')
 
       const txHash = await provider.request({
         method: 'eth_sendTransaction',
-        params: [{ from: embeddedWallet.address, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }]
+        params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }]
       })
 
       setSending(false)
@@ -308,7 +301,11 @@ export default function App() {
       addMessage('ai', '✅ **Email Wallet Transfer**\n\nSent **' + sendAmount + ' USDC** to `' + emailTo + '`\n\n**Tx Hash:** `' + txHash + '`\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/' + txHash)
     } catch (err) {
       setSending(false)
-      addMessage('ai', '❌ Transfer failed: ' + err.message)
+      if (err.code === 4001) {
+        addMessage('ai', '❌ Transfer cancelled.')
+      } else {
+        addMessage('ai', '❌ Transfer failed: ' + err.message)
+      }
     }
   }
 
