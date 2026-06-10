@@ -5,7 +5,10 @@ import Head from 'next/head'
 export default function App() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
-  const [wallet, setWallet] = useState(null)
+  const [wallet, setWallet] = useState(() => {
+    if (typeof window === 'undefined') return null
+    try { return localStorage.getItem('booai_wallet') || null } catch { return null }
+  })
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -48,6 +51,73 @@ export default function App() {
       content: "👋 Hi! I'm booAI_bot — your AI agent on ARC Testnet.\n\nI can deploy smart contracts, generate images & videos, mint NFT collections, audit Solidity code, and much more.\n\nEach task costs **0.1 USDC**. Connect your wallet to get started!",
       time: now(),
     }])
+
+    // Restore wallet session nếu đã kết nối trước đó
+    const savedWallet = localStorage.getItem('booai_wallet')
+    if (savedWallet) {
+      const provider = window.okxwallet || window.ethereum
+      if (provider) {
+        provider.request({ method: 'eth_accounts' }).then(accounts => {
+          if (accounts && accounts[0]?.toLowerCase() === savedWallet.toLowerCase()) {
+            setWallet(accounts[0])
+          } else {
+            // Session hết hạn, xóa cache
+            localStorage.removeItem('booai_wallet')
+            setWallet(null)
+          }
+        }).catch(() => {
+          localStorage.removeItem('booai_wallet')
+          setWallet(null)
+        })
+      }
+    }
+
+    // Lắng nghe sự kiện đổi account hoặc disconnect
+    const handleAccountsChanged = (accounts) => {
+      if (!accounts || accounts.length === 0) {
+        setWallet(null)
+        localStorage.removeItem('booai_wallet')
+      } else {
+        setWallet(accounts[0])
+        localStorage.setItem('booai_wallet', accounts[0])
+      }
+    }
+
+    // Lắng nghe sự kiện đổi chain
+    const handleChainChanged = () => {
+      // Reload nhẹ state, không reload cả trang
+      const provider = window.okxwallet || window.ethereum
+      if (provider) {
+        provider.request({ method: 'eth_accounts' }).then(accounts => {
+          if (!accounts || accounts.length === 0) {
+            setWallet(null)
+            localStorage.removeItem('booai_wallet')
+          }
+        }).catch(() => {})
+      }
+    }
+
+    const mmProvider = window.ethereum
+    const okxProvider = window.okxwallet
+    if (mmProvider) {
+      mmProvider.on('accountsChanged', handleAccountsChanged)
+      mmProvider.on('chainChanged', handleChainChanged)
+    }
+    if (okxProvider) {
+      okxProvider.on('accountsChanged', handleAccountsChanged)
+      okxProvider.on('chainChanged', handleChainChanged)
+    }
+
+    return () => {
+      if (mmProvider) {
+        mmProvider.removeListener('accountsChanged', handleAccountsChanged)
+        mmProvider.removeListener('chainChanged', handleChainChanged)
+      }
+      if (okxProvider) {
+        okxProvider.removeListener('accountsChanged', handleAccountsChanged)
+        okxProvider.removeListener('chainChanged', handleChainChanged)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -84,6 +154,7 @@ export default function App() {
       const addr = accounts[0]
       await switchToARC(provider)
       setWallet(addr)
+      localStorage.setItem('booai_wallet', addr)
       setShowWalletModal(false)
       addMessage('ai', `✅ Wallet connected: \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n\n🔗 Switched to **ARC Testnet** (Chain ID: 5042002)\n\nWhat would you like to build today?`)
     } catch (err) {
@@ -93,6 +164,7 @@ export default function App() {
 
   const disconnectWallet = () => {
     setWallet(null)
+    localStorage.removeItem('booai_wallet')
     addMessage('ai', '👋 Wallet disconnected. Connect again when ready!')
   }
 
