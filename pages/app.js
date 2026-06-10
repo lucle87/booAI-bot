@@ -45,7 +45,9 @@ export default function App() {
   const [connectTab, setConnectTab] = useState('wallet')
   const [magicEmail, setMagicEmail] = useState('')
   const [magicLoading, setMagicLoading] = useState(false)
-  const [magicStep, setMagicStep] = useState('input') // 'input' | 'sent'
+  const [magicStep, setMagicStep] = useState('input') // 'input' | 'otp' | 'sent'
+  const [magicOTP, setMagicOTP] = useState('')
+  const [otpLoading, setOtpLoading] = useState(false)
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -157,23 +159,31 @@ export default function App() {
     } catch (err) { addMessage('ai', `❌ Connection failed: ${err.message}`) }
   }
 
-  // Magic.link email login
+  // Magic.link — Bước 1: gửi OTP về email
   const sendMagicLink = async () => {
     if (!magicEmail || !magicEmail.includes('@')) return
     setMagicLoading(true)
-    setMagicStep('sent')
     try {
       const magic = await getMagic()
-      await magic.auth.loginWithMagicLink({ email: magicEmail, showUI: false })
+      // Dùng loginWithEmailOTP thay vì loginWithMagicLink — không bị lỗi -32603
+      await magic.auth.loginWithEmailOTP({ email: magicEmail, showUI: false })
+      // Nếu showUI: false thì Magic tự handle OTP popup
       const userInfo = await magic.user.getInfo()
       const addr = userInfo.publicAddress
       setWallet(addr); setWalletType('magic'); setWalletEmail(magicEmail)
-      localStorage.setItem('booai_wallet', addr); localStorage.setItem('booai_wallet_type', 'magic'); localStorage.setItem('booai_wallet_email', magicEmail)
+      localStorage.setItem('booai_wallet', addr)
+      localStorage.setItem('booai_wallet_type', 'magic')
+      localStorage.setItem('booai_wallet_email', magicEmail)
       setShowWalletModal(false); setMagicEmail(''); setMagicStep('input'); setMagicLoading(false)
       addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${magicEmail}\n🔑 **Address:** \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n🔗 **Network:** ARC Testnet\n\nThis wallet was auto-created from your email. What would you like to build?`)
     } catch (err) {
       setMagicLoading(false)
-      addMessage('ai', `❌ Email login failed: ${err.message}`)
+      setMagicStep('input')
+      if (err.message?.includes('Modal closed') || err.code === -32603) {
+        // user đóng popup — bình thường
+      } else {
+        addMessage('ai', `❌ Email login failed: ${err.message}`)
+      }
     }
   }
 
@@ -609,16 +619,23 @@ export default function App() {
 
             {connectTab === 'email' && (
               <>
-                {magicStep === 'input' ? (
-                  <>
+                <>
                     <div className="magic-info">
-                      ✨ Enter your email to instantly create or access your wallet. We'll send a magic link — no password needed. Your wallet address is derived from your email and secured by Magic.link.
+                      ✨ Nhập email — Magic.link sẽ gửi mã OTP 6 số. Không cần password, không cần extension. Ví được tạo tự động từ email của bạn.
                     </div>
                     <input type="email" className="email-field" placeholder="your@email.com" value={magicEmail}
                       onChange={e => setMagicEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && sendMagicLink()} autoFocus />
                     <button className="btn-magic" onClick={sendMagicLink} disabled={magicLoading || !magicEmail.includes('@')}>
-                      {magicLoading ? <><span className="spinner" />Sending magic link...</> : '✉️ Send Magic Link →'}
+                      {magicLoading
+                        ? <><span className="spinner" />Đang mở cửa sổ xác thực...</>
+                        : '✉️ Đăng nhập bằng Email →'}
                     </button>
+                    {magicLoading && (
+                      <div style={{fontSize:12,color:'#8b6fff',textAlign:'center',marginBottom:12,lineHeight:1.6}}>
+                        📬 Kiểm tra email <strong>{magicEmail}</strong><br/>
+                        Nhập mã OTP 6 số trong popup vừa mở
+                      </div>
+                    )}
                     <div className="divider-row"><div className="divider-line" /><div className="divider-text">have a wallet?</div><div className="divider-line" /></div>
                     <div style={{display:'flex',gap:8}}>
                       <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => setConnectTab('wallet')}>
@@ -631,25 +648,6 @@ export default function App() {
                       </div>
                     </div>
                   </>
-                ) : (
-                  <div className="sent-box">
-                    <div className="sent-icon">📬</div>
-                    <div className="sent-title">Check your inbox!</div>
-                    <div className="sent-sub">We sent a magic link to:</div>
-                    <div className="sent-email">{magicEmail}</div>
-                    <div className="sent-sub">Click the link in the email to sign in.<br />This tab will update automatically.</div>
-                    {magicLoading && (
-                      <div style={{fontSize:12,color:'#52526a',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:8}}>
-                        <span className="spinner" style={{borderColor:'rgba(139,111,255,0.3)',borderTopColor:'#8b6fff'}} />
-                        Waiting for confirmation...
-                      </div>
-                    )}
-                    <button onClick={() => { setMagicStep('input'); setMagicLoading(false); magicInstance=null }}
-                      style={{marginTop:16,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,padding:'8px 20px',color:'#52526a',fontSize:12,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
-                      ← Use different email
-                    </button>
-                  </div>
-                )}
               </>
             )}
 
