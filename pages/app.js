@@ -2,27 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
-// Magic.link — load dynamically, NO custom network (causes -32603 error)
-let magicInstance = null
-const getMagic = async () => {
-  if (magicInstance) return magicInstance
-  const { Magic } = await import('magic-sdk')
-  // Khong truyen network vao day — Magic dung Ethereum mainnet de auth
-  // Sau khi lay duoc address, dung fetch truc tiep den ARC RPC
-  magicInstance = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || '')
-  return magicInstance
-}
-
-// Goi ARC Testnet RPC truc tiep (cho Magic wallet khong co browser extension)
-const arcRPC = async (method, params = []) => {
-  const res = await fetch('https://rpc.testnet.arc.network', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
-  return data.result
+// Tao vi Ethereum tu email hash (deterministic, same email = same address)
+const deriveWalletFromEmail = async (email) => {
+  const { ethers } = await import('ethers')
+  const encoder = new TextEncoder()
+  const data = encoder.encode(email.toLowerCase() + 'booai_salt_2025')
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const privateKey = '0x' + hashArray.map(b => b.toString(16).padStart(2,'0')).join('')
+  const wallet = new ethers.Wallet(privateKey)
+  return { address: wallet.address, privateKey: wallet.privateKey }
 }
 
 export default function App() {
@@ -43,11 +32,11 @@ export default function App() {
 
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [connectTab, setConnectTab] = useState('wallet')
-  const [magicEmail, setMagicEmail] = useState('')
-  const [magicLoading, setMagicLoading] = useState(false)
-  const [magicStep, setMagicStep] = useState('input') // 'input' | 'otp' | 'sent'
-  const [magicOTP, setMagicOTP] = useState('')
-  const [otpLoading, setOtpLoading] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [otpInput, setOtpInput] = useState('')
+  const [emailStep, setEmailStep] = useState('input') // 'input' | 'otp'
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailError, setEmailError] = useState('')
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -91,7 +80,7 @@ export default function App() {
     // Restore MetaMask/OKX session
     const savedWallet = localStorage.getItem('booai_wallet')
     const savedType = localStorage.getItem('booai_wallet_type')
-    if (savedWallet && savedType !== 'magic') {
+    if (savedWallet && savedType !== 'email') {
       const provider = window.okxwallet || window.ethereum
       if (provider) {
         provider.request({ method: 'eth_accounts' }).then(accounts => {
@@ -105,27 +94,16 @@ export default function App() {
       }
     }
 
-    // Restore Magic session
-    if (savedWallet && savedType === 'magic') {
-      getMagic().then(async magic => {
-        try {
-          const ok = await magic.user.isLoggedIn()
-          if (!ok) {
-            localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type'); localStorage.removeItem('booai_wallet_email')
-            setWallet(null); setWalletType(null); setWalletEmail(null)
-          }
-        } catch {}
-      })
-    }
+    // Email wallet session — luon valid vi dua tren localStorage
 
     // accountsChanged / chainChanged listeners
     const handleAccountsChanged = (accounts) => {
-      if (localStorage.getItem('booai_wallet_type') === 'magic') return
+      if (localStorage.getItem('booai_wallet_type') === 'email') return
       if (!accounts || accounts.length === 0) { setWallet(null); setWalletType(null); localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type') }
       else { setWallet(accounts[0]); localStorage.setItem('booai_wallet', accounts[0]) }
     }
     const handleChainChanged = () => {
-      if (localStorage.getItem('booai_wallet_type') === 'magic') return
+      if (localStorage.getItem('booai_wallet_type') === 'email') return
       const p = window.okxwallet || window.ethereum
       if (p) p.request({ method: 'eth_accounts' }).then(a => { if (!a || !a.length) { setWallet(null); localStorage.removeItem('booai_wallet') } }).catch(() => {})
     }
@@ -159,31 +137,59 @@ export default function App() {
     } catch (err) { addMessage('ai', `❌ Connection failed: ${err.message}`) }
   }
 
-  // Magic.link — Bước 1: gửi OTP về email
-  const sendMagicLink = async () => {
-    if (!magicEmail || !magicEmail.includes('@')) return
-    setMagicLoading(true)
+  // Bước 1: Gửi OTP về email qua Resend
+  const sendOTP = async () => {
+    if (!emailInput || !emailInput.includes('@')) return
+    setEmailLoading(true)
+    setEmailError('')
     try {
-      const magic = await getMagic()
-      // Dùng loginWithEmailOTP thay vì loginWithMagicLink — không bị lỗi -32603
-      await magic.auth.loginWithEmailOTP({ email: magicEmail, showUI: true })
-      // Nếu showUI: false thì Magic tự handle OTP popup
-      const userInfo = await magic.user.getInfo()
-      const addr = userInfo.publicAddress
-      setWallet(addr); setWalletType('magic'); setWalletEmail(magicEmail)
-      localStorage.setItem('booai_wallet', addr)
-      localStorage.setItem('booai_wallet_type', 'magic')
-      localStorage.setItem('booai_wallet_email', magicEmail)
-      setShowWalletModal(false); setMagicEmail(''); setMagicStep('input'); setMagicLoading(false)
-      addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${magicEmail}\n🔑 **Address:** \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n🔗 **Network:** ARC Testnet\n\nThis wallet was auto-created from your email. What would you like to build?`)
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setEmailStep('otp')
     } catch (err) {
-      setMagicLoading(false)
-      setMagicStep('input')
-      if (err.message?.includes('Modal closed') || err.code === -32603) {
-        // user đóng popup — bình thường
-      } else {
-        addMessage('ai', `❌ Email login failed: ${err.message}`)
-      }
+      setEmailError(err.message)
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  // Bước 2: Verify OTP và tạo ví
+  const verifyOTP = async () => {
+    if (!otpInput || otpInput.length !== 6) return
+    setEmailLoading(true)
+    setEmailError('')
+    try {
+      const res = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, otp: otpInput }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      // Tạo ví local từ email
+      const { address } = await deriveWalletFromEmail(emailInput)
+
+      setWallet(address)
+      setWalletType('email')
+      setWalletEmail(emailInput)
+      localStorage.setItem('booai_wallet', address)
+      localStorage.setItem('booai_wallet_type', 'email')
+      localStorage.setItem('booai_wallet_email', emailInput)
+      setShowWalletModal(false)
+      setEmailInput('')
+      setOtpInput('')
+      setEmailStep('input')
+      addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${emailInput}\n🔑 **Address:** \`${address.slice(0,6)}...${address.slice(-4)}\`\n🔗 **Network:** ARC Testnet\n\nVí của bạn đã được tạo từ email. What would you like to build?`)
+    } catch (err) {
+      setEmailError(err.message)
+    } finally {
+      setEmailLoading(false)
     }
   }
 
@@ -192,20 +198,22 @@ export default function App() {
     return window.ethereum
   }
 
-  // Ky transaction bang Magic wallet (dung fetch truc tiep den ARC RPC)
-  const magicSendTx = async (txParams) => {
-    const magic = await getMagic()
-    // Magic cung cap web3 provider dung duoc voi eth_sendTransaction
-    const web3Provider = magic.rpcProvider
-    const txHash = await web3Provider.request({
-      method: 'eth_sendTransaction',
-      params: [txParams],
+  // Gui transaction cho email wallet bang cach sign truc tiep
+  const emailSendTx = async (txParams) => {
+    const { ethers } = await import('ethers')
+    const { privateKey } = await deriveWalletFromEmail(walletEmail)
+    const provider = new ethers.JsonRpcProvider('https://rpc.testnet.arc.network')
+    const signer = new ethers.Wallet(privateKey, provider)
+    const tx = await signer.sendTransaction({
+      to: txParams.to,
+      data: txParams.data || '0x',
+      gasLimit: txParams.gas || '0x15F90',
+      from: txParams.from,
     })
-    return txHash
+    return tx.hash
   }
 
   const disconnectWallet = async () => {
-    if (walletType === 'magic') { try { const m = await getMagic(); await m.user.logout() } catch {} }
     setWallet(null); setWalletType(null); setWalletEmail(null)
     localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type'); localStorage.removeItem('booai_wallet_email')
     addMessage('ai', '👋 Wallet disconnected. Connect again when ready!')
@@ -251,8 +259,8 @@ export default function App() {
       addMessage('ai', '⏳ Please approve the 0.1 USDC payment in your wallet...')
       const amount = BigInt(100000)
       const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
-      const txHash = walletType === 'magic'
-        ? await magicSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
+      const txHash = walletType === 'email'
+        ? await emailSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
         : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
       addMessage('ai', `✅ Payment confirmed!\n💳 Tx: \`${txHash.slice(0,20)}...\``)
       const mediaTasks = ['TEXT_TO_IMAGE','TEXT_TO_VIDEO','IMAGE_TO_VIDEO','TEXT_TO_MUSIC','GENERATE_NFT_ART']
@@ -270,8 +278,8 @@ export default function App() {
         try {
           const compileData = await (await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskType: task.taskType, params: task.params }) })).json()
           if (compileData.bytecode) {
-            const deployTx = walletType === 'magic'
-              ? await magicSendTx({ from: wallet, data: compileData.bytecode, gas: '0x493E0' })
+            const deployTx = walletType === 'email'
+              ? await emailSendTx({ from: wallet, data: compileData.bytecode, gas: '0x493E0' })
               : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }] })
             await new Promise(r => setTimeout(r, 4000))
             let contractAddr = null
@@ -308,8 +316,8 @@ export default function App() {
       const provider = await getProvider(); if (!provider || !wallet) throw new Error('Please connect wallet first')
       const amount = BigInt(Math.floor(parseFloat(sendAmount) * 1000000))
       const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
-      const txHash = walletType === 'magic'
-        ? await magicSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
+      const txHash = walletType === 'email'
+        ? await emailSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
         : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
       setSending(false); setShowEmailWallet(false); setEmailTo(''); setSendAmount('')
       addMessage('ai', '✅ **Email Wallet Transfer**\n\nSent **' + sendAmount + ' USDC** to `' + emailTo + '`\n\n**Tx Hash:** `' + txHash + '`\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/' + txHash)
@@ -320,7 +328,7 @@ export default function App() {
   const chips = ['🤖 Deploy ERC20 Token','🖼️ Create NFT Collection','🎬 Text to Video','📝 Audit My Contract','🌐 Deploy to IPFS','🪙 Create a Memecoin','🎨 Generate NFT Art','🎵 Generate Music']
   const shortAddr = wallet ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : null
   const taskData = pendingTaskRef.current || pendingTask
-  const walletLabel = walletType === 'magic' ? `📧 Email` : walletType === 'okx' ? '⬡ OKX' : '🦊 MetaMask'
+  const walletLabel = walletType === 'email' ? `📧 Email` : walletType === 'okx' ? '⬡ OKX' : '🦊 MetaMask'
 
   return (
     <>
@@ -590,13 +598,13 @@ export default function App() {
 
       {/* ===== CONNECT MODAL ===== */}
       {showWalletModal && (
-        <div className="modal-overlay" onClick={() => { setShowWalletModal(false); setMagicStep('input'); setMagicEmail('') }}>
+        <div className="modal-overlay" onClick={() => { setShowWalletModal(false); setEmailStep('input'); setEmailInput(''); setOtpInput('') }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">Connect to booAI_bot</div>
             <div className="modal-sub">Choose how you want to connect</div>
             <div className="connect-tabs">
               <button className={`connect-tab ${connectTab==='wallet'?'active':''}`} onClick={() => setConnectTab('wallet')}>🔗 Wallet</button>
-              <button className={`connect-tab ${connectTab==='email'?'active':''}`} onClick={() => { setConnectTab('email'); setMagicStep('input') }}>📧 Email Login</button>
+              <button className={`connect-tab ${connectTab==='email'?'active':''}`} onClick={() => { setConnectTab('email'); setEmailStep('input') }}>📧 Email Login</button>
             </div>
 
             {connectTab === 'wallet' && (
@@ -619,23 +627,18 @@ export default function App() {
 
             {connectTab === 'email' && (
               <>
-                <>
+                {emailStep === 'input' ? (
+                  <>
                     <div className="magic-info">
-                      ✨ Nhập email — Magic.link sẽ gửi mã OTP 6 số. Không cần password, không cần extension. Ví được tạo tự động từ email của bạn.
+                      ✨ Nhập email — chúng tôi gửi mã OTP 6 số. Không cần password, không cần extension. Ví được tạo tự động từ email của bạn.
                     </div>
-                    <input type="email" className="email-field" placeholder="your@email.com" value={magicEmail}
-                      onChange={e => setMagicEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && sendMagicLink()} autoFocus />
-                    <button className="btn-magic" onClick={sendMagicLink} disabled={magicLoading || !magicEmail.includes('@')}>
-                      {magicLoading
-                        ? <><span className="spinner" />Đang mở cửa sổ xác thực...</>
-                        : '✉️ Đăng nhập bằng Email →'}
+                    <input type="email" className="email-field" placeholder="your@email.com" value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      onKeyDown={e => e.key==='Enter' && sendOTP()} autoFocus />
+                    {emailError && <div style={{fontSize:12,color:'#ff6b6b',marginBottom:12}}>{emailError}</div>}
+                    <button className="btn-magic" onClick={sendOTP} disabled={emailLoading || !emailInput.includes('@')}>
+                      {emailLoading ? <><span className="spinner" />Đang gửi mã...</> : '✉️ Gửi mã OTP →'}
                     </button>
-                    {magicLoading && (
-                      <div style={{fontSize:12,color:'#8b6fff',textAlign:'center',marginBottom:12,lineHeight:1.6}}>
-                        📬 Kiểm tra email <strong>{magicEmail}</strong><br/>
-                        Nhập mã OTP 6 số trong popup vừa mở
-                      </div>
-                    )}
                     <div className="divider-row"><div className="divider-line" /><div className="divider-text">have a wallet?</div><div className="divider-line" /></div>
                     <div style={{display:'flex',gap:8}}>
                       <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => setConnectTab('wallet')}>
@@ -648,10 +651,37 @@ export default function App() {
                       </div>
                     </div>
                   </>
+                ) : (
+                  <>
+                    <div style={{textAlign:'center',marginBottom:20}}>
+                      <div style={{fontSize:36,marginBottom:8}}>📬</div>
+                      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,marginBottom:6}}>Check your email!</div>
+                      <div style={{fontSize:13,color:'#52526a',marginBottom:4}}>We sent a 6-digit code to:</div>
+                      <div style={{fontFamily:'Space Mono,monospace',fontSize:13,color:'#8b6fff'}}>{emailInput}</div>
+                    </div>
+                    <input
+                      type="text" className="email-field"
+                      placeholder="Enter 6-digit code"
+                      value={otpInput} maxLength={6}
+                      onChange={e => setOtpInput(e.target.value.replace(/\D/g,''))}
+                      onKeyDown={e => e.key==='Enter' && verifyOTP()}
+                      autoFocus
+                      style={{textAlign:'center',fontSize:28,letterSpacing:8,fontFamily:'Space Mono,monospace'}}
+                    />
+                    {emailError && <div style={{fontSize:12,color:'#ff6b6b',marginBottom:12,textAlign:'center'}}>{emailError}</div>}
+                    <button className="btn-magic" onClick={verifyOTP} disabled={emailLoading || otpInput.length !== 6}>
+                      {emailLoading ? <><span className="spinner" />Verifying...</> : '✅ Verify & Connect →'}
+                    </button>
+                    <button onClick={() => { setEmailStep('input'); setOtpInput(''); setEmailError('') }}
+                      style={{width:'100%',padding:'8px',background:'transparent',border:'none',color:'#52526a',fontSize:12,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+                      ← Use different email
+                    </button>
+                  </>
+                )}
               </>
             )}
 
-            <button className="modal-close" onClick={() => { setShowWalletModal(false); setMagicStep('input'); setMagicEmail('') }}>Cancel</button>
+            <button className="modal-close" onClick={() => { setShowWalletModal(false); setEmailStep('input'); setEmailInput(''); setOtpInput('') }}>Cancel</button>
           </div>
         </div>
       )}
@@ -661,7 +691,7 @@ export default function App() {
         <div className="modal-overlay">
           <div className="pay-modal">
             <div className="modal-title">Confirm Payment</div>
-            <div className="modal-sub">{walletType==='magic' ? '📧 Email wallet will sign this transaction' : 'Your wallet will ask you to sign'}</div>
+            <div className="modal-sub">{walletType==='email' ? '📧 Email wallet will sign automatically' : 'Your wallet will ask you to sign'}</div>
             <div className="pay-task">
               <div className="pay-task-label">// TASK</div>
               <div className="pay-task-name">{taskData?.taskName || 'Smart Contract Task'}</div>
@@ -673,7 +703,7 @@ export default function App() {
             {wallet && (
               <div className="pay-wallet">
                 From: <span>{shortAddr}</span>
-                {walletEmail && <span style={{color:'#8b6fff'}}> · {walletEmail}</span>}
+                {walletEmail && walletType==='email' && <span style={{color:'#8b6fff'}}> · {walletEmail}</span>}
                 {' '}→ ARC Testnet
               </div>
             )}
