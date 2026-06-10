@@ -2,6 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
+// Magic.link — load dynamically để tránh SSR crash
+let magicInstance = null
+const getMagic = async () => {
+  if (magicInstance) return magicInstance
+  const { Magic } = await import('magic-sdk')
+  magicInstance = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || '', {
+    network: { rpcUrl: 'https://rpc.testnet.arc.network', chainId: 5042002 },
+  })
+  return magicInstance
+}
+
 export default function App() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
@@ -9,16 +20,27 @@ export default function App() {
     if (typeof window === 'undefined') return null
     try { return localStorage.getItem('booai_wallet') || null } catch { return null }
   })
+  const [walletType, setWalletType] = useState(() => {
+    if (typeof window === 'undefined') return null
+    try { return localStorage.getItem('booai_wallet_type') || null } catch { return null }
+  })
+  const [walletEmail, setWalletEmail] = useState(() => {
+    if (typeof window === 'undefined') return null
+    try { return localStorage.getItem('booai_wallet_email') || null } catch { return null }
+  })
+
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [connectTab, setConnectTab] = useState('wallet')
+  const [magicEmail, setMagicEmail] = useState('')
+  const [magicLoading, setMagicLoading] = useState(false)
+  const [magicStep, setMagicStep] = useState('input') // 'input' | 'sent'
+
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [taskHistory, setTaskHistory] = useState(() => {
     if (typeof window === 'undefined') return []
-    try {
-      const saved = localStorage.getItem('booai_task_history')
-      return saved ? JSON.parse(saved) : []
-    } catch { return [] }
+    try { return JSON.parse(localStorage.getItem('booai_task_history') || '[]') } catch { return [] }
   })
   const [showPayModal, setShowPayModal] = useState(false)
   const [pendingTask, setPendingTask] = useState(null)
@@ -44,355 +66,222 @@ export default function App() {
   const USDC_ADDRESS = '0x3600000000000000000000000000000000000000'
   const TREASURY = '0x84a83d99637e5abdadebe49881a469bbbe482aa7'
 
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
   useEffect(() => {
     setMounted(true)
-    setMessages([{
-      role: 'ai',
-      content: "👋 Hi! I'm booAI_bot — your AI agent on ARC Testnet.\n\nI can deploy smart contracts, generate images & videos, mint NFT collections, audit Solidity code, and much more.\n\nEach task costs **0.1 USDC**. Connect your wallet to get started!",
-      time: now(),
-    }])
+    setMessages([{ role: 'ai', content: "👋 Hi! I'm booAI_bot — your AI agent on ARC Testnet.\n\nI can deploy smart contracts, generate images & videos, mint NFT collections, audit Solidity code, and much more.\n\nEach task costs **0.1 USDC**. Connect your wallet to get started!", time: now() }])
 
-    // Restore wallet session nếu đã kết nối trước đó
+    // Restore MetaMask/OKX session
     const savedWallet = localStorage.getItem('booai_wallet')
-    if (savedWallet) {
+    const savedType = localStorage.getItem('booai_wallet_type')
+    if (savedWallet && savedType !== 'magic') {
       const provider = window.okxwallet || window.ethereum
       if (provider) {
         provider.request({ method: 'eth_accounts' }).then(accounts => {
           if (accounts && accounts[0]?.toLowerCase() === savedWallet.toLowerCase()) {
             setWallet(accounts[0])
           } else {
-            // Session hết hạn, xóa cache
-            localStorage.removeItem('booai_wallet')
-            setWallet(null)
+            localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type')
+            setWallet(null); setWalletType(null)
           }
-        }).catch(() => {
-          localStorage.removeItem('booai_wallet')
-          setWallet(null)
-        })
+        }).catch(() => { localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type'); setWallet(null); setWalletType(null) })
       }
     }
 
-    // Lắng nghe sự kiện đổi account hoặc disconnect
+    // Restore Magic session
+    if (savedWallet && savedType === 'magic') {
+      getMagic().then(async magic => {
+        try {
+          const ok = await magic.user.isLoggedIn()
+          if (!ok) {
+            localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type'); localStorage.removeItem('booai_wallet_email')
+            setWallet(null); setWalletType(null); setWalletEmail(null)
+          }
+        } catch {}
+      })
+    }
+
+    // accountsChanged / chainChanged listeners
     const handleAccountsChanged = (accounts) => {
-      if (!accounts || accounts.length === 0) {
-        setWallet(null)
-        localStorage.removeItem('booai_wallet')
-      } else {
-        setWallet(accounts[0])
-        localStorage.setItem('booai_wallet', accounts[0])
-      }
+      if (localStorage.getItem('booai_wallet_type') === 'magic') return
+      if (!accounts || accounts.length === 0) { setWallet(null); setWalletType(null); localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type') }
+      else { setWallet(accounts[0]); localStorage.setItem('booai_wallet', accounts[0]) }
     }
-
-    // Lắng nghe sự kiện đổi chain
     const handleChainChanged = () => {
-      // Reload nhẹ state, không reload cả trang
-      const provider = window.okxwallet || window.ethereum
-      if (provider) {
-        provider.request({ method: 'eth_accounts' }).then(accounts => {
-          if (!accounts || accounts.length === 0) {
-            setWallet(null)
-            localStorage.removeItem('booai_wallet')
-          }
-        }).catch(() => {})
-      }
+      if (localStorage.getItem('booai_wallet_type') === 'magic') return
+      const p = window.okxwallet || window.ethereum
+      if (p) p.request({ method: 'eth_accounts' }).then(a => { if (!a || !a.length) { setWallet(null); localStorage.removeItem('booai_wallet') } }).catch(() => {})
     }
-
-    const mmProvider = window.ethereum
-    const okxProvider = window.okxwallet
-    if (mmProvider) {
-      mmProvider.on('accountsChanged', handleAccountsChanged)
-      mmProvider.on('chainChanged', handleChainChanged)
-    }
-    if (okxProvider) {
-      okxProvider.on('accountsChanged', handleAccountsChanged)
-      okxProvider.on('chainChanged', handleChainChanged)
-    }
-
+    if (window.ethereum) { window.ethereum.on('accountsChanged', handleAccountsChanged); window.ethereum.on('chainChanged', handleChainChanged) }
+    if (window.okxwallet) { window.okxwallet.on('accountsChanged', handleAccountsChanged); window.okxwallet.on('chainChanged', handleChainChanged) }
     return () => {
-      if (mmProvider) {
-        mmProvider.removeListener('accountsChanged', handleAccountsChanged)
-        mmProvider.removeListener('chainChanged', handleChainChanged)
-      }
-      if (okxProvider) {
-        okxProvider.removeListener('accountsChanged', handleAccountsChanged)
-        okxProvider.removeListener('chainChanged', handleChainChanged)
-      }
+      if (window.ethereum) { window.ethereum.removeListener('accountsChanged', handleAccountsChanged); window.ethereum.removeListener('chainChanged', handleChainChanged) }
+      if (window.okxwallet) { window.okxwallet.removeListener('accountsChanged', handleAccountsChanged); window.okxwallet.removeListener('chainChanged', handleChainChanged) }
     }
   }, [])
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   if (!mounted) return null
 
-  function now() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  }
-
   const switchToARC = async (provider) => {
-    try {
-      await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARC_CHAIN.chainId }] })
-    } catch (err) {
-      if (err.code === 4902) {
-        await provider.request({ method: 'wallet_addEthereumChain', params: [ARC_CHAIN] })
-      } else throw err
-    }
+    try { await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARC_CHAIN.chainId }] }) }
+    catch (err) { if (err.code === 4902) await provider.request({ method: 'wallet_addEthereumChain', params: [ARC_CHAIN] }); else throw err }
   }
 
   const connectWallet = async (type) => {
-    let provider = null
-    if (type === 'okx') {
-      if (!window.okxwallet) { window.open('https://www.okx.com/web3', '_blank'); return }
-      provider = window.okxwallet
-    } else {
-      if (!window.ethereum) { window.open('https://metamask.io/download/', '_blank'); return }
-      provider = window.ethereum
-    }
+    let provider = type === 'okx' ? window.okxwallet : window.ethereum
+    if (!provider) { window.open(type === 'okx' ? 'https://www.okx.com/web3' : 'https://metamask.io/download/', '_blank'); return }
     try {
       const accounts = await provider.request({ method: 'eth_requestAccounts' })
       const addr = accounts[0]
       await switchToARC(provider)
-      setWallet(addr)
-      localStorage.setItem('booai_wallet', addr)
+      setWallet(addr); setWalletType(type); setWalletEmail(null)
+      localStorage.setItem('booai_wallet', addr); localStorage.setItem('booai_wallet_type', type); localStorage.removeItem('booai_wallet_email')
       setShowWalletModal(false)
       addMessage('ai', `✅ Wallet connected: \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n\n🔗 Switched to **ARC Testnet** (Chain ID: 5042002)\n\nWhat would you like to build today?`)
+    } catch (err) { addMessage('ai', `❌ Connection failed: ${err.message}`) }
+  }
+
+  // Magic.link email login
+  const sendMagicLink = async () => {
+    if (!magicEmail || !magicEmail.includes('@')) return
+    setMagicLoading(true)
+    setMagicStep('sent')
+    try {
+      const magic = await getMagic()
+      await magic.auth.loginWithMagicLink({ email: magicEmail, showUI: false })
+      const userInfo = await magic.user.getInfo()
+      const addr = userInfo.publicAddress
+      setWallet(addr); setWalletType('magic'); setWalletEmail(magicEmail)
+      localStorage.setItem('booai_wallet', addr); localStorage.setItem('booai_wallet_type', 'magic'); localStorage.setItem('booai_wallet_email', magicEmail)
+      setShowWalletModal(false); setMagicEmail(''); setMagicStep('input'); setMagicLoading(false)
+      addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${magicEmail}\n🔑 **Address:** \`${addr.slice(0,6)}...${addr.slice(-4)}\`\n🔗 **Network:** ARC Testnet\n\nThis wallet was auto-created from your email. What would you like to build?`)
     } catch (err) {
-      addMessage('ai', `❌ Connection failed: ${err.message}`)
+      setMagicLoading(false)
+      addMessage('ai', `❌ Email login failed: ${err.message}`)
     }
   }
 
-  const disconnectWallet = () => {
-    setWallet(null)
-    localStorage.removeItem('booai_wallet')
+  const getProvider = async () => {
+    if (walletType === 'magic') { const m = await getMagic(); return m.rpcProvider }
+    if (walletType === 'okx') return window.okxwallet
+    return window.ethereum
+  }
+
+  const disconnectWallet = async () => {
+    if (walletType === 'magic') { try { const m = await getMagic(); await m.user.logout() } catch {} }
+    setWallet(null); setWalletType(null); setWalletEmail(null)
+    localStorage.removeItem('booai_wallet'); localStorage.removeItem('booai_wallet_type'); localStorage.removeItem('booai_wallet_email')
     addMessage('ai', '👋 Wallet disconnected. Connect again when ready!')
   }
 
-  const addMessage = (role, content, extra = {}) => {
-    setMessages(prev => [...prev, { role, content, time: now(), ...extra }])
-  }
+  const addMessage = (role, content, extra = {}) => setMessages(prev => [...prev, { role, content, time: now(), ...extra }])
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+    const file = e.target.files[0]; if (!file) return
     setAttachedFile(file)
-    if (file.type.startsWith('image/')) setAttachedPreview(URL.createObjectURL(file))
-    else setAttachedPreview(null)
+    if (file.type.startsWith('image/')) setAttachedPreview(URL.createObjectURL(file)); else setAttachedPreview(null)
     e.target.value = ''
   }
-
   const removeFile = () => { setAttachedFile(null); setAttachedPreview(null) }
 
   const handleSend = async (text) => {
-    const msg = text || input.trim()
-    if (!msg && !attachedFile) return
+    const msg = text || input.trim(); if (!msg && !attachedFile) return
     setInput('')
     const displayMsg = msg || `📎 ${attachedFile?.name}`
     addMessage('user', displayMsg, { filePreview: attachedPreview, fileName: attachedFile?.name, fileType: attachedFile?.type })
     const aiMsg = attachedFile ? `${msg ? msg + '\n\n' : ''}[User attached file: ${attachedFile.name} (${attachedFile.type})]` : msg
-    removeFile()
-    setLoading(true)
+    removeFile(); setLoading(true)
     const newHistory = [...conversationHistory, { role: 'user', content: aiMsg }]
     setConversationHistory(newHistory)
     try {
-      const res = await fetch('/api/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newHistory, walletConnected: !!wallet }),
-      })
-      const data = await res.json()
-      setLoading(false)
+      const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: newHistory, walletConnected: !!wallet }) })
+      const data = await res.json(); setLoading(false)
       if (data.error) { addMessage('ai', `❌ ${data.error}`); return }
-      const assistantMsg = { role: 'assistant', content: data.reply }
-      setConversationHistory([...newHistory, assistantMsg])
+      setConversationHistory([...newHistory, { role: 'assistant', content: data.reply }])
       if (data.ready && data.taskType) {
         addMessage('ai', data.summary + '\n\n**Ready to execute for 0.1 USDC.** Confirm below.')
-        pendingTaskRef.current = data
-        setPendingTask(data)
-        setShowPayModal(true)
-      } else {
-        addMessage('ai', data.reply)
-      }
-    } catch (err) {
-      setLoading(false)
-      addMessage('ai', '❌ Something went wrong. Please try again.')
-    }
+        pendingTaskRef.current = data; setPendingTask(data); setShowPayModal(true)
+      } else { addMessage('ai', data.reply) }
+    } catch { setLoading(false); addMessage('ai', '❌ Something went wrong. Please try again.') }
   }
 
   const handleExecuteTask = async () => {
     const task = pendingTaskRef.current || pendingTask
     if (!wallet) { setShowPayModal(false); setShowWalletModal(true); return }
     setShowPayModal(false)
-
     try {
-      const provider = window.okxwallet || window.ethereum
-      if (!provider) throw new Error('Wallet not found')
-
-      // STEP 1: PAY 0.1 USDC
+      const provider = await getProvider(); if (!provider) throw new Error('Wallet not found')
       addMessage('ai', '⏳ Please approve the 0.1 USDC payment in your wallet...')
       const amount = BigInt(100000)
-      const transferData = '0xa9059cbb' +
-        TREASURY.replace('0x', '').padStart(64, '0') +
-        amount.toString(16).padStart(64, '0')
-
-      const txHash = await provider.request({
-        method: 'eth_sendTransaction',
-        params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }]
-      })
-
+      const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
+      const txHash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
       addMessage('ai', `✅ Payment confirmed!\n💳 Tx: \`${txHash.slice(0,20)}...\``)
-
-      const mediaTasks = ['TEXT_TO_IMAGE', 'TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'TEXT_TO_MUSIC', 'GENERATE_NFT_ART']
-      const contractTasks = ['DEPLOY_ERC20', 'DEPLOY_NFT', 'CREATE_MEMECOIN', 'DAO_TOKEN', 'CUSTOM_CONTRACT']
-
-      // STEP 2A: MEDIA GENERATION
+      const mediaTasks = ['TEXT_TO_IMAGE','TEXT_TO_VIDEO','IMAGE_TO_VIDEO','TEXT_TO_MUSIC','GENERATE_NFT_ART']
+      const contractTasks = ['DEPLOY_ERC20','DEPLOY_NFT','CREATE_MEMECOIN','DAO_TOKEN','CUSTOM_CONTRACT']
       if (mediaTasks.includes(task?.taskType)) {
-        addMessage('ai', '🎨 Generating your content... This may take 30-60 seconds...')
+        addMessage('ai', '🎨 Generating your content...')
         try {
-          const genRes = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskType: task.taskType, params: task.params })
-          })
-          const genData = await genRes.json()
-          if (genData.error) {
-            addMessage('ai', `⚠️ Generation failed: ${genData.error}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
-          } else if (genData.type === 'text') {
-            addMessage('ai', `✅ Done!\n\n${genData.message}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
-          } else {
-            addMessage('ai',
-              `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet${genData.note ? '\n\n' + genData.note : ''}`,
-              { type: 'success', mediaUrl: genData.url, mediaType: genData.type }
-            )
-          }
-        } catch (genErr) {
-          addMessage('ai', `⚠️ Payment done, generation failed: ${genErr.message}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
-        }
-
-      // STEP 2B: CONTRACT DEPLOY
+          const genData = await (await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskType: task.taskType, params: task.params }) })).json()
+          if (genData.error) addMessage('ai', `⚠️ Generation failed: ${genData.error}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
+          else if (genData.type === 'text') addMessage('ai', `✅ Done!\n\n${genData.message}\n\n**Payment Tx:** \`${txHash}\``, { type: 'success' })
+          else addMessage('ai', `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC${genData.note ? '\n\n' + genData.note : ''}`, { type: 'success', mediaUrl: genData.url, mediaType: genData.type })
+        } catch (e) { addMessage('ai', `⚠️ Payment done, generation failed: ${e.message}`, { type: 'success' }) }
       } else if (contractTasks.includes(task?.taskType)) {
         addMessage('ai', '⚙️ Deploying your smart contract on ARC Testnet...')
         try {
-          const compileRes = await fetch('/api/compile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskType: task.taskType, params: task.params })
-          })
-          const compileData = await compileRes.json()
-
+          const compileData = await (await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskType: task.taskType, params: task.params }) })).json()
           if (compileData.bytecode) {
-            // Deploy via wallet
-            const deployTx = await provider.request({
-              method: 'eth_sendTransaction',
-              params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }]
-            })
-            // Wait for receipt
+            const deployTx = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }] })
             await new Promise(r => setTimeout(r, 4000))
             let contractAddr = null
-            try {
-              const receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [deployTx] })
-              contractAddr = receipt?.contractAddress
-            } catch {}
+            try { const receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [deployTx] }); contractAddr = receipt?.contractAddress } catch {}
             contractAddr = contractAddr || '0x' + Math.random().toString(16).substr(2, 40)
-            addMessage('ai',
-              `✅ Contract deployed!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${contractAddr}\`\n**Deploy Tx:** \`${deployTx}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Explorer:** https://testnet.arcscan.app/address/${contractAddr}`,
-              { type: 'success' }
-            )
+            addMessage('ai', `✅ Contract deployed!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${contractAddr}\`\n**Deploy Tx:** \`${deployTx}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Explorer:** https://testnet.arcscan.app/address/${contractAddr}`, { type: 'success' })
           } else {
-            // No bytecode — show mock with source
             const mockAddr = '0x' + Math.random().toString(16).substr(2, 40)
-            addMessage('ai',
-              `✅ Contract ready!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${mockAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/address/${mockAddr}`,
-              { type: 'success' }
-            )
+            addMessage('ai', `✅ Contract ready!\n\n**Name:** ${task.params?.name}\n**Symbol:** ${task.params?.symbol}\n**Contract:** \`${mockAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Explorer:** https://testnet.arcscan.app/address/${mockAddr}`, { type: 'success' })
           }
         } catch (deployErr) {
-          if (deployErr.code === 4001) {
-            addMessage('ai', `❌ Deployment cancelled.\n**Payment Tx:** \`${txHash}\``)
-          } else {
-            const mockAddr = '0x' + Math.random().toString(16).substr(2, 40)
-            addMessage('ai',
-              `✅ Task completed!\n\n**Contract:** \`${mockAddr}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n⚠️ ${deployErr.message}`,
-              { type: 'success' }
-            )
-          }
+          if (deployErr.code === 4001) addMessage('ai', `❌ Deployment cancelled.\n**Payment Tx:** \`${txHash}\``)
+          else { const m = '0x' + Math.random().toString(16).substr(2, 40); addMessage('ai', `✅ Task completed!\n\n**Contract:** \`${m}\`\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n⚠️ ${deployErr.message}`, { type: 'success' }) }
         }
-
-      // STEP 2C: OTHER
       } else {
-        addMessage('ai',
-          `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet`,
-          { type: 'success' }
-        )
+        addMessage('ai', `✅ Task completed!\n\n**Task:** ${task?.taskName}\n**Payment Tx:** \`${txHash}\`\n**Fee:** 0.1 USDC\n**Network:** ARC Testnet`, { type: 'success' })
       }
-
-      // SAVE HISTORY
       setTaskHistory(prev => {
         const h = [{ icon: getTaskIcon(task?.taskType), name: task?.taskName || 'Task', fee: '0.1 USDC', status: 'done', time: now(), txHash }, ...prev].slice(0, 20)
-        localStorage.setItem('booai_task_history', JSON.stringify(h))
-        return h
+        localStorage.setItem('booai_task_history', JSON.stringify(h)); return h
       })
-      setPendingTask(null)
-      pendingTaskRef.current = null
-
+      setPendingTask(null); pendingTaskRef.current = null
     } catch (err) {
-      if (err.code === 4001 || err.message?.includes('rejected')) {
-        addMessage('ai', '❌ Payment rejected. Task cancelled.')
-      } else {
-        addMessage('ai', `❌ Error: ${err.message}`)
-      }
+      if (err.code === 4001 || err.message?.includes('rejected')) addMessage('ai', '❌ Payment rejected. Task cancelled.')
+      else addMessage('ai', `❌ Error: ${err.message}`)
     }
   }
 
-  const handleCancelTask = () => {
-    setShowPayModal(false)
-    setPendingTask(null)
-    pendingTaskRef.current = null
-    addMessage('ai', 'Task cancelled. Let me know if you want to try something else!')
-  }
+  const handleCancelTask = () => { setShowPayModal(false); setPendingTask(null); pendingTaskRef.current = null; addMessage('ai', 'Task cancelled. Let me know if you want to try something else!') }
 
   const handleEmailSend = async () => {
-    if (!emailTo || !sendAmount) return
-    setSending(true)
+    if (!emailTo || !sendAmount) return; setSending(true)
     try {
-      // Use connected MetaMask/OKX wallet to send USDC
-      const provider = window.okxwallet || window.ethereum
-      if (!provider) throw new Error('Please connect your wallet first')
-      if (!wallet) throw new Error('Please connect your wallet first')
-
+      const provider = await getProvider(); if (!provider || !wallet) throw new Error('Please connect wallet first')
       const amount = BigInt(Math.floor(parseFloat(sendAmount) * 1000000))
-      const transferData = '0xa9059cbb' +
-        TREASURY.replace('0x', '').padStart(64, '0') +
-        amount.toString(16).padStart(64, '0')
-
-      const txHash = await provider.request({
-        method: 'eth_sendTransaction',
-        params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }]
-      })
-
-      setSending(false)
-      setShowEmailWallet(false)
-      setEmailTo('')
-      setSendAmount('')
+      const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
+      const txHash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
+      setSending(false); setShowEmailWallet(false); setEmailTo(''); setSendAmount('')
       addMessage('ai', '✅ **Email Wallet Transfer**\n\nSent **' + sendAmount + ' USDC** to `' + emailTo + '`\n\n**Tx Hash:** `' + txHash + '`\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/' + txHash)
-    } catch (err) {
-      setSending(false)
-      if (err.code === 4001) {
-        addMessage('ai', '❌ Transfer cancelled.')
-      } else {
-        addMessage('ai', '❌ Transfer failed: ' + err.message)
-      }
-    }
+    } catch (err) { setSending(false); addMessage('ai', err.code === 4001 ? '❌ Transfer cancelled.' : '❌ Transfer failed: ' + err.message) }
   }
 
-  const getTaskIcon = (type) => {
-    const icons = { DEPLOY_ERC20: '🤖', DEPLOY_NFT: '🖼️', TEXT_TO_IMAGE: '🎨', TEXT_TO_VIDEO: '🎬', IMAGE_TO_VIDEO: '🔄', AUDIT_CONTRACT: '📝', DEPLOY_WEBSITE: '🌐', CREATE_MEMECOIN: '🪙', TEXT_TO_MUSIC: '🎵' }
-    return icons[type] || '⚡'
-  }
-
-  const chips = ['🤖 Deploy ERC20 Token', '🖼️ Create NFT Collection', '🎬 Text to Video', '📝 Audit My Contract', '🌐 Deploy to IPFS', '🪙 Create a Memecoin', '🎨 Generate NFT Art', '🎵 Generate Music']
+  const getTaskIcon = (type) => ({ DEPLOY_ERC20:'🤖', DEPLOY_NFT:'🖼️', TEXT_TO_IMAGE:'🎨', TEXT_TO_VIDEO:'🎬', IMAGE_TO_VIDEO:'🔄', AUDIT_CONTRACT:'📝', DEPLOY_WEBSITE:'🌐', CREATE_MEMECOIN:'🪙', TEXT_TO_MUSIC:'🎵' }[type] || '⚡')
+  const chips = ['🤖 Deploy ERC20 Token','🖼️ Create NFT Collection','🎬 Text to Video','📝 Audit My Contract','🌐 Deploy to IPFS','🪙 Create a Memecoin','🎨 Generate NFT Art','🎵 Generate Music']
   const shortAddr = wallet ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : null
   const taskData = pendingTaskRef.current || pendingTask
+  const walletLabel = walletType === 'magic' ? `📧 Email` : walletType === 'okx' ? '⬡ OKX' : '🦊 MetaMask'
 
   return (
     <>
@@ -402,7 +291,6 @@ export default function App() {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet" />
       </Head>
-
       <style suppressHydrationWarning>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; overflow: hidden; }
@@ -415,13 +303,15 @@ export default function App() {
         .sidebar-logo img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
         .sidebar-logo span { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
         .wallet-box { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px; }
-        .wallet-connected { display: flex; flex-direction: column; gap: 6px; }
+        .wallet-connected { display: flex; flex-direction: column; gap: 5px; }
+        .wallet-type-badge { font-size: 10px; color: #8b6fff; font-family: 'Space Mono', monospace; }
         .wallet-addr { font-family: 'Space Mono', monospace; font-size: 12px; color: #00d4aa; font-weight: 500; }
+        .wallet-email-label { font-size: 10px; color: #52526a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .wallet-net { font-size: 10px; color: #52526a; display: flex; align-items: center; gap: 4px; }
         .wallet-dot { width: 6px; height: 6px; border-radius: 50%; background: #00d4aa; }
-        .btn-disconnect { margin-top: 8px; width: 100%; padding: 7px; background: transparent; border: 1px solid rgba(255,100,100,0.25); border-radius: 7px; color: #ff6b6b; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+        .btn-disconnect { margin-top: 8px; width: 100%; padding: 7px; background: transparent; border: 1px solid rgba(255,100,100,0.25); border-radius: 7px; color: #ff6b6b; font-size: 12px; cursor: pointer; transition: all 0.2s; }
         .btn-disconnect:hover { background: rgba(255,100,100,0.08); border-color: rgba(255,100,100,0.5); }
-        .btn-connect { width: 100%; background: #8b6fff; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
+        .btn-connect { width: 100%; background: #8b6fff; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
         .btn-connect:hover { opacity: 0.85; }
         .sidebar-section { padding: 16px 20px; flex: 1; overflow-y: auto; }
         .sidebar-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #3a3a52; margin-bottom: 12px; }
@@ -488,16 +378,36 @@ export default function App() {
         .dot:nth-child(2) { animation-delay: 0.2s; }
         .dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.88); z-index: 99999; display: flex; align-items: center; justify-content: center; }
-        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 400px; max-width: 90vw; }
-        .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 99999; display: flex; align-items: center; justify-content: center; }
+        .modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 420px; max-width: 90vw; }
+        .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
         .modal-sub { font-size: 13px; color: #52526a; margin-bottom: 24px; }
+        .connect-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 4px; margin-bottom: 24px; }
+        .connect-tab { flex: 1; padding: 9px; text-align: center; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; border: none; background: transparent; color: #52526a; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .connect-tab.active { background: #8b6fff; color: #fff; }
+        .connect-tab:hover:not(.active) { color: #eeeef5; }
         .wallet-option { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; cursor: pointer; margin-bottom: 10px; transition: all 0.2s; }
         .wallet-option:hover { border-color: #8b6fff; background: rgba(139,111,255,0.06); }
         .wallet-option-icon { font-size: 24px; }
         .wallet-option-name { font-size: 14px; font-weight: 500; }
         .wallet-option-desc { font-size: 11px; color: #52526a; margin-top: 2px; }
-        .wallet-option.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+        .magic-info { background: rgba(139,111,255,0.06); border: 1px solid rgba(139,111,255,0.15); border-radius: 8px; padding: 12px 14px; margin-bottom: 20px; font-size: 12px; color: #8b6fff; line-height: 1.7; }
+        .email-field { width: 100%; background: #06060f; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; color: #eeeef5; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s; box-sizing: border-box; margin-bottom: 16px; }
+        .email-field:focus { border-color: #8b6fff; }
+        .email-field::placeholder { color: #3a3a52; }
+        .btn-magic { width: 100%; background: linear-gradient(135deg, #8b6fff, #6b4fd8); color: #fff; border: none; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: opacity 0.2s; margin-bottom: 16px; }
+        .btn-magic:hover:not(:disabled) { opacity: 0.85; }
+        .btn-magic:disabled { opacity: 0.5; cursor: not-allowed; }
+        .divider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
+        .divider-text { font-size: 11px; color: #3a3a52; font-family: 'Space Mono', monospace; }
+        .sent-box { text-align: center; padding: 8px 0; }
+        .sent-icon { font-size: 44px; margin-bottom: 12px; }
+        .sent-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+        .sent-sub { font-size: 13px; color: #52526a; line-height: 1.7; margin-bottom: 12px; }
+        .sent-email { font-family: 'Space Mono', monospace; font-size: 12px; color: #8b6fff; background: rgba(139,111,255,0.08); border: 1px solid rgba(139,111,255,0.2); padding: 8px 16px; border-radius: 8px; margin-bottom: 16px; display: inline-block; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .modal-close { width: 100%; padding: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #52526a; font-size: 13px; cursor: pointer; margin-top: 8px; font-family: 'Inter', sans-serif; }
         .pay-modal { background: #0d0d1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; width: 380px; max-width: 90vw; }
         .pay-task { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
@@ -509,13 +419,14 @@ export default function App() {
         .pay-wallet { font-size: 11px; color: #52526a; font-family: 'Space Mono', monospace; margin-bottom: 20px; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; }
         .pay-wallet span { color: #00d4aa; }
         .pay-btns { display: flex; gap: 10px; }
-        .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #52526a; font-size: 14px; cursor: pointer; font-family: 'Inter', sans-serif; }
-        .btn-pay { flex: 2; padding: 12px; background: #8b6fff; border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
+        .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #52526a; font-size: 14px; cursor: pointer; }
+        .btn-pay { flex: 2; padding: 12px; background: #8b6fff; border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
         .btn-pay:hover { opacity: 0.85; }
         @media (max-width: 768px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
       `}</style>
 
       <div className="app-layout">
+        {/* SIDEBAR */}
         <div className="sidebar">
           <div className="sidebar-top">
             <div className="sidebar-logo" onClick={() => router.push('/')}>
@@ -525,9 +436,11 @@ export default function App() {
             <div className="wallet-box">
               {wallet ? (
                 <div className="wallet-connected">
+                  <div className="wallet-type-badge">{walletLabel}</div>
                   <div className="wallet-addr">{shortAddr}</div>
+                  {walletEmail && <div className="wallet-email-label">{walletEmail}</div>}
                   <div className="wallet-net"><div className="wallet-dot" />ARC Testnet · Connected</div>
-                  <button className="btn-disconnect" onClick={disconnectWallet}>Disconnect Wallet</button>
+                  <button className="btn-disconnect" onClick={disconnectWallet}>Disconnect</button>
                 </div>
               ) : (
                 <button className="btn-connect" onClick={() => setShowWalletModal(true)}>Connect Wallet →</button>
@@ -536,10 +449,9 @@ export default function App() {
           </div>
           <div className="sidebar-section">
             <div className="sidebar-label">// TASK HISTORY</div>
-            {taskHistory.length === 0 ? (
-              <div className="empty-state">No tasks yet.<br />Start chatting!</div>
-            ) : (
-              taskHistory.map((t, i) => (
+            {taskHistory.length === 0
+              ? <div className="empty-state">No tasks yet.<br />Start chatting!</div>
+              : taskHistory.map((t, i) => (
                 <div key={i} className="history-item">
                   <div className="history-icon">{t.icon}</div>
                   <div className="history-info">
@@ -549,21 +461,21 @@ export default function App() {
                   <div className="history-status">✓</div>
                 </div>
               ))
-            )}
+            }
           </div>
           <div className="sidebar-bottom">
             <button className="back-btn" onClick={() => router.push('/')}>← Back to home</button>
             <div style={{marginBottom:10}}>
-              <button
-                onClick={() => setShowEmailWallet(true)}
-                style={{width:'100%',background:'rgba(139,111,255,0.1)',border:'1px solid rgba(139,111,255,0.3)',borderRadius:8,padding:'10px',color:'#8b6fff',fontSize:12,cursor:'pointer',fontFamily:'Inter,sans-serif',marginBottom:6,transition:'all 0.2s'}}
-              >💌 Email Wallet</button>
-              <div style={{fontSize:10,color:'#3a3a52',fontFamily:'Space Mono,monospace',lineHeight:1.5}}>Send USDC to anyone via email address. No MetaMask needed on receiving end.</div>
+              <button onClick={() => setShowEmailWallet(true)} style={{width:'100%',background:'rgba(139,111,255,0.1)',border:'1px solid rgba(139,111,255,0.3)',borderRadius:8,padding:'10px',color:'#8b6fff',fontSize:12,cursor:'pointer',marginBottom:6,transition:'all 0.2s'}}>
+                💌 Email Wallet
+              </button>
+              <div style={{fontSize:10,color:'#3a3a52',fontFamily:'Space Mono,monospace',lineHeight:1.5}}>Send USDC to anyone via email. No MetaMask needed.</div>
             </div>
             <a href="https://faucet.circle.com" target="_blank" rel="noreferrer" className="faucet-link">💧 Get testnet USDC</a>
           </div>
         </div>
 
+        {/* CHAT PANEL */}
         <div className="chat-panel">
           <div className="chat-topbar">
             <div className="chat-topbar-title">AI Agent Chat</div>
@@ -572,45 +484,24 @@ export default function App() {
               <span className="topbar-fee">0.1 USDC / task</span>
               {wallet
                 ? <span className="topbar-addr">{shortAddr}</span>
-                : <button className="btn-connect" style={{ padding: '6px 16px', fontSize: 12, width: 'auto' }} onClick={() => setShowWalletModal(true)}>Connect Wallet</button>
+                : <button className="btn-connect" style={{padding:'6px 16px',fontSize:12,width:'auto'}} onClick={() => setShowWalletModal(true)}>Connect Wallet</button>
               }
             </div>
           </div>
-
           <div className="messages-area">
             {messages.map((m, i) => (
               <div key={i} className={`msg-row ${m.role === 'user' ? 'user' : ''}`}>
-                <div className={`msg-avatar ${m.role === 'ai' ? 'ai' : 'user-av'}`}>
-                  {m.role === 'ai' ? '🤖' : '👤'}
-                </div>
+                <div className={`msg-avatar ${m.role === 'ai' ? 'ai' : 'user-av'}`}>{m.role === 'ai' ? '🤖' : '👤'}</div>
                 <div className="msg-content">
-                  <div className={`bubble ${m.role === 'user' ? 'user' : m.type === 'success' ? 'success' : 'ai'}`}>
+                  <div className={`bubble ${m.role === 'ai' ? (m.type === 'success' ? 'success' : 'ai') : 'user'}`}>
                     {m.filePreview && <img src={m.filePreview} alt="attachment" className="bubble-img" />}
                     {m.fileName && !m.filePreview && <div className="bubble-file">📎 {m.fileName}</div>}
-                    <span dangerouslySetInnerHTML={{
-                      __html: m.content
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/`(.*?)`/g, '<code>$1</code>')
-                        .replace(/\n/g, '<br/>')
-                    }} />
-                    {m.mediaUrl && m.mediaType === 'image' && (
-                      <div style={{marginTop:10}}>
-                        <img src={m.mediaUrl} alt="Generated" style={{maxWidth:'100%', borderRadius:8, display:'block'}} onError={e => e.target.style.display='none'} />
-                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Open full size</a>
-                      </div>
-                    )}
-                    {m.mediaUrl && m.mediaType === 'video' && (
-                      <div style={{marginTop:10}}>
-                        <video src={m.mediaUrl} controls style={{maxWidth:'100%', borderRadius:8, display:'block'}} />
-                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Download video</a>
-                      </div>
-                    )}
-                    {m.mediaUrl && m.mediaType === 'audio' && (
-                      <div style={{marginTop:10}}>
-                        <audio src={m.mediaUrl} controls style={{width:'100%'}} />
-                        <a href={m.mediaUrl} target="_blank" rel="noreferrer" style={{fontSize:11, color:'#00d4aa', marginTop:4, display:'block'}}>🔗 Download audio</a>
-                      </div>
-                    )}
+                    {m.content.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, j) => {
+                      if (part.startsWith('**') && part.endsWith('**')) return <strong key={j}>{part.slice(2,-2)}</strong>
+                      if (part.startsWith('`') && part.endsWith('`')) return <code key={j}>{part.slice(1,-1)}</code>
+                      return part
+                    })}
+                    {m.mediaUrl && m.mediaType === 'image' && <img src={m.mediaUrl} alt="Generated" style={{maxWidth:'100%',borderRadius:8,marginTop:8,display:'block'}} />}
                   </div>
                   <div className="msg-time">{m.time}</div>
                 </div>
@@ -619,59 +510,38 @@ export default function App() {
             {loading && (
               <div className="msg-row">
                 <div className="msg-avatar ai">🤖</div>
-                <div className="bubble ai">
-                  <div className="loading-dots">
-                    <div className="dot" /><div className="dot" /><div className="dot" />
-                  </div>
+                <div className="msg-content">
+                  <div className="bubble ai"><div className="loading-dots"><div className="dot" /><div className="dot" /><div className="dot" /></div></div>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
-
-          {messages.length === 1 && (
+          {messages.length <= 1 && (
             <div className="chips-area">
-              {chips.map(c => (
-                <button key={c} className="chip" onClick={() => handleSend(c)}>{c}</button>
-              ))}
+              {chips.map(c => <button key={c} className="chip" onClick={() => handleSend(c)}>{c}</button>)}
             </div>
           )}
-
           <div className="input-area">
             {attachedFile && (
               <div className="file-preview">
-                {attachedPreview ? <img src={attachedPreview} alt="preview" /> : <span style={{ fontSize: 24 }}>{attachedFile.type.startsWith('video/') ? '🎬' : '📎'}</span>}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="file-preview-name">{attachedFile.name}</div>
-                  <div className="file-preview-size">{(attachedFile.size / 1024).toFixed(1)} KB</div>
-                </div>
+                {attachedPreview ? <img src={attachedPreview} alt="preview" /> : <div style={{width:48,height:48,background:'rgba(255,255,255,0.06)',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>📎</div>}
+                <div className="file-preview-name">{attachedFile.name}</div>
+                <div className="file-preview-size">{(attachedFile.size/1024).toFixed(1)}KB</div>
                 <button className="file-remove" onClick={removeFile}>✕</button>
               </div>
             )}
             <div className="input-box">
-              <button className="upload-btn" onClick={() => fileInputRef.current?.click()} title="Attach file">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                </svg>
+              <button className="upload-btn" onClick={() => fileInputRef.current?.click()}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
               </button>
-              <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,video/*,.pdf,.sol" onChange={handleFileSelect} />
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={input}
-                onChange={e => {
-                  setInput(e.target.value)
-                  e.target.style.height = 'auto'
-                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-                }}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                placeholder="Describe what you want to build... (Enter to send)"
-                disabled={loading}
-              />
+              <input type="file" ref={fileInputRef} style={{display:'none'}} accept="image/*,video/*,.pdf,.sol" onChange={handleFileSelect} />
+              <textarea ref={inputRef} rows={1} value={input}
+                onChange={e => { setInput(e.target.value); e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px' }}
+                onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                placeholder="Describe what you want to build... (Enter to send)" disabled={loading} />
               <button className="send-btn" onClick={() => handleSend()} disabled={loading || (!input.trim() && !attachedFile)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               </button>
             </div>
             <div className="input-hint">📎 Attach image/video · 💡 Describe in plain English · 0.1 USDC per task</div>
@@ -679,33 +549,92 @@ export default function App() {
         </div>
       </div>
 
+      {/* ===== CONNECT MODAL ===== */}
       {showWalletModal && (
-        <div className="modal-overlay" onClick={() => setShowWalletModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowWalletModal(false); setMagicStep('input'); setMagicEmail('') }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Connect Wallet</div>
-            <div className="modal-sub">Choose your wallet to connect to ARC Testnet</div>
-            <div className="wallet-option" onClick={() => connectWallet('metamask')}>
-              <div className="wallet-option-icon">🦊</div>
-              <div><div className="wallet-option-name">MetaMask</div><div className="wallet-option-desc">Browser Extension</div></div>
+            <div className="modal-title">Connect to booAI_bot</div>
+            <div className="modal-sub">Choose how you want to connect</div>
+            <div className="connect-tabs">
+              <button className={`connect-tab ${connectTab==='wallet'?'active':''}`} onClick={() => setConnectTab('wallet')}>🔗 Wallet</button>
+              <button className={`connect-tab ${connectTab==='email'?'active':''}`} onClick={() => { setConnectTab('email'); setMagicStep('input') }}>📧 Email Login</button>
             </div>
-            <div className="wallet-option" onClick={() => connectWallet('okx')}>
-              <div className="wallet-option-icon">⬡</div>
-              <div><div className="wallet-option-name">OKX Wallet</div><div className="wallet-option-desc">OKX Browser Extension</div></div>
-            </div>
-            <div className="wallet-option disabled">
-              <div className="wallet-option-icon">📧</div>
-              <div><div className="wallet-option-name">Email Login</div><div className="wallet-option-desc">Coming Soon</div></div>
-            </div>
-            <button className="modal-close" onClick={() => setShowWalletModal(false)}>Cancel</button>
+
+            {connectTab === 'wallet' && (
+              <>
+                <div className="wallet-option" onClick={() => connectWallet('metamask')}>
+                  <div className="wallet-option-icon">🦊</div>
+                  <div><div className="wallet-option-name">MetaMask</div><div className="wallet-option-desc">Browser Extension · Most popular</div></div>
+                </div>
+                <div className="wallet-option" onClick={() => connectWallet('okx')}>
+                  <div className="wallet-option-icon">⬡</div>
+                  <div><div className="wallet-option-name">OKX Wallet</div><div className="wallet-option-desc">OKX Browser Extension</div></div>
+                </div>
+                <div className="divider-row"><div className="divider-line" /><div className="divider-text">no extension?</div><div className="divider-line" /></div>
+                <div className="wallet-option" style={{borderColor:'rgba(139,111,255,0.3)',background:'rgba(139,111,255,0.04)'}} onClick={() => setConnectTab('email')}>
+                  <div className="wallet-option-icon">📧</div>
+                  <div><div className="wallet-option-name" style={{color:'#8b6fff'}}>Email Login</div><div className="wallet-option-desc">Create wallet from email · No extension needed</div></div>
+                </div>
+              </>
+            )}
+
+            {connectTab === 'email' && (
+              <>
+                {magicStep === 'input' ? (
+                  <>
+                    <div className="magic-info">
+                      ✨ Enter your email to instantly create or access your wallet. We'll send a magic link — no password needed. Your wallet address is derived from your email and secured by Magic.link.
+                    </div>
+                    <input type="email" className="email-field" placeholder="your@email.com" value={magicEmail}
+                      onChange={e => setMagicEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && sendMagicLink()} autoFocus />
+                    <button className="btn-magic" onClick={sendMagicLink} disabled={magicLoading || !magicEmail.includes('@')}>
+                      {magicLoading ? <><span className="spinner" />Sending magic link...</> : '✉️ Send Magic Link →'}
+                    </button>
+                    <div className="divider-row"><div className="divider-line" /><div className="divider-text">have a wallet?</div><div className="divider-line" /></div>
+                    <div style={{display:'flex',gap:8}}>
+                      <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => setConnectTab('wallet')}>
+                        <div className="wallet-option-icon" style={{fontSize:18}}>🦊</div>
+                        <div><div className="wallet-option-name" style={{fontSize:12}}>MetaMask</div></div>
+                      </div>
+                      <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => connectWallet('okx')}>
+                        <div className="wallet-option-icon" style={{fontSize:18}}>⬡</div>
+                        <div><div className="wallet-option-name" style={{fontSize:12}}>OKX</div></div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="sent-box">
+                    <div className="sent-icon">📬</div>
+                    <div className="sent-title">Check your inbox!</div>
+                    <div className="sent-sub">We sent a magic link to:</div>
+                    <div className="sent-email">{magicEmail}</div>
+                    <div className="sent-sub">Click the link in the email to sign in.<br />This tab will update automatically.</div>
+                    {magicLoading && (
+                      <div style={{fontSize:12,color:'#52526a',display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:8}}>
+                        <span className="spinner" style={{borderColor:'rgba(139,111,255,0.3)',borderTopColor:'#8b6fff'}} />
+                        Waiting for confirmation...
+                      </div>
+                    )}
+                    <button onClick={() => { setMagicStep('input'); setMagicLoading(false); magicInstance=null }}
+                      style={{marginTop:16,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:8,padding:'8px 20px',color:'#52526a',fontSize:12,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+                      ← Use different email
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button className="modal-close" onClick={() => { setShowWalletModal(false); setMagicStep('input'); setMagicEmail('') }}>Cancel</button>
           </div>
         </div>
       )}
 
+      {/* ===== PAY MODAL ===== */}
       {showPayModal && (
         <div className="modal-overlay">
           <div className="pay-modal">
             <div className="modal-title">Confirm Payment</div>
-            <div className="modal-sub">Your wallet will ask you to sign the transaction</div>
+            <div className="modal-sub">{walletType==='magic' ? '📧 Email wallet will sign this transaction' : 'Your wallet will ask you to sign'}</div>
             <div className="pay-task">
               <div className="pay-task-label">// TASK</div>
               <div className="pay-task-name">{taskData?.taskName || 'Smart Contract Task'}</div>
@@ -715,85 +644,74 @@ export default function App() {
               <div className="pay-amount-val">0.1 USDC</div>
             </div>
             {wallet && (
-              <div className="pay-wallet">From: <span>{shortAddr}</span> → ARC Testnet</div>
+              <div className="pay-wallet">
+                From: <span>{shortAddr}</span>
+                {walletEmail && <span style={{color:'#8b6fff'}}> · {walletEmail}</span>}
+                {' '}→ ARC Testnet
+              </div>
             )}
             <div className="pay-btns">
               <button className="btn-cancel" onClick={handleCancelTask}>Cancel</button>
-              <button className="btn-pay" onClick={handleExecuteTask}>
-                {wallet ? '💳 Pay & Execute →' : 'Connect Wallet First'}
-              </button>
+              <button className="btn-pay" onClick={handleExecuteTask}>{wallet ? '💳 Pay & Execute →' : 'Connect Wallet First'}</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ===== EMAIL WALLET SEND ===== */}
       {showEmailWallet && (
         <div className="modal-overlay" onClick={() => setShowEmailWallet(false)}>
           <div style={{background:'#0d0d1a',border:'1px solid rgba(255,255,255,0.1)',borderRadius:16,padding:32,width:460,maxWidth:'90vw'}} onClick={e => e.stopPropagation()}>
-            <div style={{fontFamily:'Space Grotesk,sans-serif',fontSize:18,fontWeight:700,marginBottom:4}}>💌 Email Wallet</div>
-            <div style={{fontSize:13,color:'#52526a',marginBottom:24,lineHeight:1.6}}>
-              Send USDC to anyone using just their email address.<br/>Uses your connected wallet to sign the transaction.
-            </div>
-
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,marginBottom:4}}>💌 Email Wallet</div>
+            <div style={{fontSize:13,color:'#52526a',marginBottom:24,lineHeight:1.6}}>Send USDC to anyone using just their email address.</div>
             {!wallet ? (
               <div style={{textAlign:'center',padding:'20px 0'}}>
                 <div style={{fontSize:40,marginBottom:16}}>🔗</div>
                 <div style={{fontSize:15,color:'#eeeef5',fontWeight:500,marginBottom:8}}>Connect Wallet First</div>
-                <div style={{fontSize:13,color:'#52526a',marginBottom:24}}>You need to connect MetaMask or OKX wallet to send USDC.</div>
+                <div style={{fontSize:13,color:'#52526a',marginBottom:24}}>Connect MetaMask, OKX, or use Email Login.</div>
                 <button onClick={() => { setShowEmailWallet(false); setShowWalletModal(true) }}
                   style={{background:'#8b6fff',color:'#fff',border:'none',borderRadius:10,padding:'12px 32px',fontSize:14,fontWeight:500,cursor:'pointer',width:'100%'}}>
                   Connect Wallet →
                 </button>
               </div>
             ) : (
-              <div>
+              <>
                 <div style={{background:'rgba(0,212,170,0.06)',border:'1px solid rgba(0,212,170,0.15)',borderRadius:10,padding:14,marginBottom:20}}>
                   <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:4}}>SENDING FROM</div>
                   <div style={{fontSize:13,color:'#00d4aa',fontFamily:'Space Mono,monospace'}}>{shortAddr} · ARC Testnet</div>
+                  {walletEmail && <div style={{fontSize:11,color:'#8b6fff',marginTop:4}}>{walletEmail}</div>}
                 </div>
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:6}}>SEND TO EMAIL</div>
                   <input value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@email.com"
                     style={{width:'100%',background:'#06060f',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'10px 14px',color:'#eeeef5',fontSize:13,boxSizing:'border-box',outline:'none'}} />
-                  <div style={{fontSize:10,color:'#3a3a52',marginTop:4}}>Recipient must have registered their wallet address</div>
                 </div>
                 <div style={{marginBottom:20}}>
                   <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:6}}>AMOUNT (USDC)</div>
                   <input value={sendAmount} onChange={e => setSendAmount(e.target.value)} placeholder="0.00" type="number" min="0" step="0.1"
-                    style={{width:'100%',background:'#06060f',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'10px 14px',color:'#eeeef5',fontSize:20,fontFamily:'Space Grotesk,sans-serif',boxSizing:'border-box',outline:'none'}} />
+                    style={{width:'100%',background:'#06060f',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,padding:'10px 14px',color:'#eeeef5',fontSize:20,fontFamily:"'Space Grotesk',sans-serif",boxSizing:'border-box',outline:'none'}} />
                 </div>
                 <div style={{background:'rgba(139,111,255,0.06)',border:'1px solid rgba(139,111,255,0.15)',borderRadius:8,padding:'12px 14px',marginBottom:20}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{fontSize:12,color:'#52526a'}}>Amount</span>
-                    <span style={{fontSize:12,color:'#eeeef5'}}>{sendAmount || '0.00'} USDC</span>
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{fontSize:12,color:'#52526a'}}>Network fee</span>
-                    <span style={{fontSize:12,color:'#eeeef5'}}>~0.01 USDC</span>
-                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:12,color:'#52526a'}}>Amount</span><span style={{fontSize:12,color:'#eeeef5'}}>{sendAmount||'0.00'} USDC</span></div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:12,color:'#52526a'}}>Network fee</span><span style={{fontSize:12,color:'#eeeef5'}}>~0.01 USDC</span></div>
                   <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:8,marginTop:4,display:'flex',justifyContent:'space-between'}}>
                     <span style={{fontSize:12,fontWeight:500,color:'#eeeef5'}}>Total</span>
-                    <span style={{fontSize:12,fontWeight:500,color:'#00d4aa'}}>{sendAmount ? (parseFloat(sendAmount)+0.01).toFixed(2) : '0.01'} USDC</span>
+                    <span style={{fontSize:12,fontWeight:500,color:'#00d4aa'}}>{sendAmount?(parseFloat(sendAmount)+0.01).toFixed(2):'0.01'} USDC</span>
                   </div>
                 </div>
                 <div style={{display:'flex',gap:10}}>
-                  <button onClick={() => setShowEmailWallet(false)}
-                    style={{flex:1,padding:12,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,color:'#52526a',fontSize:14,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
-                    Cancel
-                  </button>
+                  <button onClick={() => setShowEmailWallet(false)} style={{flex:1,padding:12,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,color:'#52526a',fontSize:14,cursor:'pointer'}}>Cancel</button>
                   <button onClick={handleEmailSend} disabled={sending||!emailTo||!sendAmount}
-                    style={{flex:2,padding:12,background:'#8b6fff',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:500,cursor:'pointer',fontFamily:'Inter,sans-serif',opacity:(sending||!emailTo||!sendAmount)?0.5:1}}>
-                    {sending ? '⏳ Sending...' : '💸 Send USDC →'}
+                    style={{flex:2,padding:12,background:'#8b6fff',border:'none',borderRadius:10,color:'#fff',fontSize:14,fontWeight:500,cursor:'pointer',opacity:(sending||!emailTo||!sendAmount)?0.5:1}}>
+                    {sending?'⏳ Sending...':'💸 Send USDC →'}
                   </button>
                 </div>
-                <div style={{fontSize:10,color:'#3a3a52',textAlign:'center',marginTop:12,fontFamily:'Space Mono,monospace'}}>
-                  ARC Testnet · USDC Native · No extra fees
-                </div>
-              </div>
+                <div style={{fontSize:10,color:'#3a3a52',textAlign:'center',marginTop:12,fontFamily:'Space Mono,monospace'}}>ARC Testnet · USDC Native · No extra fees</div>
+              </>
             )}
           </div>
         </div>
       )}
-
     </>
   )
 }
