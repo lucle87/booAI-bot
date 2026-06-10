@@ -1,40 +1,35 @@
 // pages/api/verify-otp.js
-import { createHash } from 'crypto'
+import { createHmac } from 'crypto'
 
-// Import cùng store từ send-otp (Next.js giữ module trong memory)
-// Dùng global để share giữa 2 API routes
-if (!global.otpStore) global.otpStore = {}
+// Tạo OTP giống hệt send-otp.js — verify bằng cách tạo lại và so sánh
+function generateOTP(email, windowMinutes = 10, offset = 0) {
+  const salt = process.env.WALLET_SALT || 'booai_salt_2025'
+  const window = Math.floor(Date.now() / (windowMinutes * 60 * 1000)) + offset
+  const hmac = createHmac('sha256', salt)
+  hmac.update(email.toLowerCase() + ':' + window)
+  const hash = hmac.digest('hex')
+  const num = parseInt(hash.slice(0, 8), 16)
+  return String(num % 1000000).padStart(6, '0')
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
   const { email, otp } = req.body
   if (!email || !otp) return res.status(400).json({ error: 'Missing email or OTP' })
 
-  const key = email.toLowerCase()
-  const record = global.otpStore[key]
+  const emailLower = email.toLowerCase()
+  const inputOtp = otp.toString().trim()
 
-  if (!record) return res.status(400).json({ error: 'No OTP found. Please request a new code.' })
-  if (Date.now() > record.expires) {
-    delete global.otpStore[key]
-    return res.status(400).json({ error: 'OTP expired. Please request a new code.' })
+  // Kiểm tra window hiện tại và window trước (phòng trường hợp gửi cuối window)
+  const validOtps = [
+    generateOTP(emailLower, 10, 0),
+    generateOTP(emailLower, 10, -1),
+  ]
+
+  if (!validOtps.includes(inputOtp)) {
+    return res.status(400).json({ error: 'Invalid or expired code. Please try again.' })
   }
-  if (record.otp !== otp.toString()) {
-    return res.status(400).json({ error: 'Invalid code. Please try again.' })
-  }
 
-  // OTP đúng — xóa khỏi store
-  delete global.otpStore[key]
-
-  // Tạo wallet address từ email hash (deterministic)
-  // Dùng ethers để tạo wallet từ private key được derive từ email
-  const { ethers } = await import('ethers')
-  const emailHash = createHash('sha256').update(email.toLowerCase() + process.env.WALLET_SALT || 'booai_salt_2025').digest('hex')
-  const privateKey = '0x' + emailHash
-  const wallet = new ethers.Wallet(privateKey)
-
-  res.json({
-    success: true,
-    address: wallet.address,
-    // KHÔNG trả về privateKey — lưu phía client
-  })
+  // OTP đúng — trả về success (wallet tạo phía client)
+  res.json({ success: true, email: emailLower })
 }
