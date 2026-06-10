@@ -166,7 +166,7 @@ export default function App() {
     try {
       const magic = await getMagic()
       // Dùng loginWithEmailOTP thay vì loginWithMagicLink — không bị lỗi -32603
-      await magic.auth.loginWithEmailOTP({ email: magicEmail, showUI: false })
+      await magic.auth.loginWithEmailOTP({ email: magicEmail, showUI: true })
       // Nếu showUI: false thì Magic tự handle OTP popup
       const userInfo = await magic.user.getInfo()
       const addr = userInfo.publicAddress
