@@ -326,6 +326,42 @@ export default function Home() {
 
       <hr className="divider" />
 
+      {/* EMAIL WALLET */}
+      <div className="section">
+        <div className="section-tag">// EMAIL WALLET · NEW FEATURE</div>
+        <h2 className="section-title">Send USDC with just an email</h2>
+        <p className="section-sub">
+          No MetaMask needed on the receiving end. Create a wallet from your email address and send USDC to anyone on ARC Testnet — just like sending a message.
+        </p>
+        <div className="email-wallet-section">
+          <div className="email-wallet-steps">
+            <div className="ew-step">
+              <div className="ew-step-icon">💌</div>
+              <div className="ew-step-title">Email Address</div>
+              <div className="ew-step-sub">Your identity & wallet</div>
+            </div>
+            <div className="ew-arrow">→</div>
+            <div className="ew-step">
+              <div className="ew-step-icon">💸</div>
+              <div className="ew-step-title">Send USDC</div>
+              <div className="ew-step-sub">Instant on ARC Testnet</div>
+            </div>
+            <div className="ew-arrow">→</div>
+            <div className="ew-step">
+              <div className="ew-step-icon">✅</div>
+              <div className="ew-step-title">Received</div>
+              <div className="ew-step-sub">No extension needed</div>
+            </div>
+          </div>
+          <button className="ew-btn" onClick={handleChat}>
+            💌 Open Email Wallet →
+          </button>
+          <div className="ew-hint">Open app → click "💌 Email Wallet" in sidebar</div>
+        </div>
+      </div>
+
+      <hr className="divider" />
+
       {/* CAPABILITIES */}
       <div className="section">
         <div className="section-tag">// CAPABILITIES</div>
@@ -423,47 +459,6 @@ export default function Home() {
             <div className="testi-author">@web3_founder</div>
             <div className="testi-role">Web3 Founder · DeFi Builder</div>
           </div>
-        </div>
-      </div>
-
-      <hr className="divider" />
-
-      {/* EMAIL WALLET — chỉ 1 lần, đặt đúng chỗ giữa Testimonials và FAQ */}
-      <div className="section">
-        <div className="section-tag">// EMAIL WALLET · NEW FEATURE</div>
-        <h2 className="section-title">Send USDC with just an email</h2>
-        <p className="section-sub">
-          No MetaMask needed on the receiving end. Create a wallet from your email address and send USDC to anyone on ARC Testnet — just like sending a message.
-        </p>
-
-        <div className="email-wallet-section">
-          <div className="email-wallet-steps">
-            <div className="ew-step">
-              <div className="ew-step-icon">💌</div>
-              <div className="ew-step-title">Email Address</div>
-              <div className="ew-step-sub">Your identity & wallet</div>
-            </div>
-            <div className="ew-arrow">→</div>
-            <div className="ew-step">
-              <div className="ew-step-icon">💸</div>
-              <div className="ew-step-title">Send USDC</div>
-              <div className="ew-step-sub">Instant on ARC Testnet</div>
-            </div>
-            <div className="ew-arrow">→</div>
-            <div className="ew-step">
-              <div className="ew-step-icon">✅</div>
-              <div className="ew-step-title">Received</div>
-              <div className="ew-step-sub">No extension needed</div>
-            </div>
-          </div>
-
-          <button
-            className="ew-btn"
-            onClick={handleChat}
-          >
-            💌 Open Email Wallet →
-          </button>
-          <div className="ew-hint">Open app → click "💌 Email Wallet" in sidebar</div>
         </div>
       </div>
 
