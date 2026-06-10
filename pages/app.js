@@ -2,15 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
-// Magic.link — load dynamically để tránh SSR crash
+// Magic.link — load dynamically, NO custom network (causes -32603 error)
 let magicInstance = null
 const getMagic = async () => {
   if (magicInstance) return magicInstance
   const { Magic } = await import('magic-sdk')
-  magicInstance = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || '', {
-    network: { rpcUrl: 'https://rpc.testnet.arc.network', chainId: 5042002 },
-  })
+  // Khong truyen network vao day — Magic dung Ethereum mainnet de auth
+  // Sau khi lay duoc address, dung fetch truc tiep den ARC RPC
+  magicInstance = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || '')
   return magicInstance
+}
+
+// Goi ARC Testnet RPC truc tiep (cho Magic wallet khong co browser extension)
+const arcRPC = async (method, params = []) => {
+  const res = await fetch('https://rpc.testnet.arc.network', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  })
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+  return data.result
 }
 
 export default function App() {
@@ -166,9 +178,20 @@ export default function App() {
   }
 
   const getProvider = async () => {
-    if (walletType === 'magic') { const m = await getMagic(); return m.rpcProvider }
     if (walletType === 'okx') return window.okxwallet
     return window.ethereum
+  }
+
+  // Ky transaction bang Magic wallet (dung fetch truc tiep den ARC RPC)
+  const magicSendTx = async (txParams) => {
+    const magic = await getMagic()
+    // Magic cung cap web3 provider dung duoc voi eth_sendTransaction
+    const web3Provider = magic.rpcProvider
+    const txHash = await web3Provider.request({
+      method: 'eth_sendTransaction',
+      params: [txParams],
+    })
+    return txHash
   }
 
   const disconnectWallet = async () => {
@@ -218,7 +241,9 @@ export default function App() {
       addMessage('ai', '⏳ Please approve the 0.1 USDC payment in your wallet...')
       const amount = BigInt(100000)
       const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
-      const txHash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
+      const txHash = walletType === 'magic'
+        ? await magicSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
+        : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
       addMessage('ai', `✅ Payment confirmed!\n💳 Tx: \`${txHash.slice(0,20)}...\``)
       const mediaTasks = ['TEXT_TO_IMAGE','TEXT_TO_VIDEO','IMAGE_TO_VIDEO','TEXT_TO_MUSIC','GENERATE_NFT_ART']
       const contractTasks = ['DEPLOY_ERC20','DEPLOY_NFT','CREATE_MEMECOIN','DAO_TOKEN','CUSTOM_CONTRACT']
@@ -235,7 +260,9 @@ export default function App() {
         try {
           const compileData = await (await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskType: task.taskType, params: task.params }) })).json()
           if (compileData.bytecode) {
-            const deployTx = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }] })
+            const deployTx = walletType === 'magic'
+              ? await magicSendTx({ from: wallet, data: compileData.bytecode, gas: '0x493E0' })
+              : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, data: compileData.bytecode, gas: '0x493E0' }] })
             await new Promise(r => setTimeout(r, 4000))
             let contractAddr = null
             try { const receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [deployTx] }); contractAddr = receipt?.contractAddress } catch {}
@@ -271,7 +298,9 @@ export default function App() {
       const provider = await getProvider(); if (!provider || !wallet) throw new Error('Please connect wallet first')
       const amount = BigInt(Math.floor(parseFloat(sendAmount) * 1000000))
       const transferData = '0xa9059cbb' + TREASURY.replace('0x', '').padStart(64, '0') + amount.toString(16).padStart(64, '0')
-      const txHash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
+      const txHash = walletType === 'magic'
+        ? await magicSendTx({ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' })
+        : await provider.request({ method: 'eth_sendTransaction', params: [{ from: wallet, to: USDC_ADDRESS, data: transferData, gas: '0x15F90' }] })
       setSending(false); setShowEmailWallet(false); setEmailTo(''); setSendAmount('')
       addMessage('ai', '✅ **Email Wallet Transfer**\n\nSent **' + sendAmount + ' USDC** to `' + emailTo + '`\n\n**Tx Hash:** `' + txHash + '`\n**Network:** ARC Testnet\n**Explorer:** https://testnet.arcscan.app/tx/' + txHash)
     } catch (err) { setSending(false); addMessage('ai', err.code === 4001 ? '❌ Transfer cancelled.' : '❌ Transfer failed: ' + err.message) }
