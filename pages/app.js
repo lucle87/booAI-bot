@@ -185,7 +185,7 @@ export default function App() {
       setEmailInput('')
       setOtpInput('')
       setEmailStep('input')
-      addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${emailInput}\n🔑 **Address:** \`${address.slice(0,6)}...${address.slice(-4)}\`\n🔗 **Network:** ARC Testnet\n\nVí của bạn đã được tạo từ email. What would you like to build?`)
+      addMessage('ai', `✅ Email wallet connected!\n\n📧 **Email:** ${emailInput}\n🔑 **Address:** \`${address}\`\n🔗 **Network:** ARC Testnet\n\nVí của bạn đã được tạo từ email. What would you like to build?`)
     } catch (err) {
       setEmailError(err.message)
     } finally {
@@ -610,11 +610,15 @@ export default function App() {
             {connectTab === 'wallet' && (
               <>
                 <div className="wallet-option" onClick={() => connectWallet('metamask')}>
-                  <div className="wallet-option-icon">🦊</div>
+                  <div className="wallet-option-icon">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" style={{width:28,height:28}} alt="MetaMask" />
+                  </div>
                   <div><div className="wallet-option-name">MetaMask</div><div className="wallet-option-desc">Browser Extension · Most popular</div></div>
                 </div>
                 <div className="wallet-option" onClick={() => connectWallet('okx')}>
-                  <div className="wallet-option-icon">⬡</div>
+                  <div className="wallet-option-icon">
+                    <img src="https://static.okx.com/cdn/assets/imgs/247/58E63FEA47A2B7D7.png" style={{width:28,height:28,borderRadius:6}} alt="OKX" />
+                  </div>
                   <div><div className="wallet-option-name">OKX Wallet</div><div className="wallet-option-desc">OKX Browser Extension</div></div>
                 </div>
                 <div className="divider-row"><div className="divider-line" /><div className="divider-text">no extension?</div><div className="divider-line" /></div>
@@ -642,11 +646,11 @@ export default function App() {
                     <div className="divider-row"><div className="divider-line" /><div className="divider-text">have a wallet?</div><div className="divider-line" /></div>
                     <div style={{display:'flex',gap:8}}>
                       <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => setConnectTab('wallet')}>
-                        <div className="wallet-option-icon" style={{fontSize:18}}>🦊</div>
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" style={{width:24,height:24}} alt="MetaMask" />
                         <div><div className="wallet-option-name" style={{fontSize:12}}>MetaMask</div></div>
                       </div>
                       <div className="wallet-option" style={{flex:1,padding:12,marginBottom:0}} onClick={() => connectWallet('okx')}>
-                        <div className="wallet-option-icon" style={{fontSize:18}}>⬡</div>
+                        <img src="https://static.okx.com/cdn/assets/imgs/247/58E63FEA47A2B7D7.png" style={{width:24,height:24,borderRadius:4}} alt="OKX" />
                         <div><div className="wallet-option-name" style={{fontSize:12}}>OKX</div></div>
                       </div>
                     </div>
