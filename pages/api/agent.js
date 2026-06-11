@@ -7,98 +7,197 @@ const MODELS = [
 ]
 
 // ============================================================
-// ARC KNOWLEDGE BASE (tích hợp trực tiếp, không cần API ngoài)
+// ARC KNOWLEDGE BASE — cập nhật từ docs.arc.io chính thức
 // ============================================================
 const ARC_KB = {
-  overview: `ARC Network là Layer-1 blockchain mã nguồn mở do Circle (công ty tạo ra USDC) xây dựng.
-- Mục tiêu: "Economic OS" cho internet — hạ tầng tài chính lập trình được
-- Native gas token: USDC (phí gas tính bằng đô, không volatile)
+  overview: `ARC NETWORK — Layer-1 blockchain mã nguồn mở do Circle (công ty tạo ra USDC) xây dựng.
+Nguồn: https://docs.arc.io
+
+Thông tin cơ bản:
+- Mục tiêu: "Economic OS" cho internet — hạ tầng tài chính lập trình được toàn cầu
+- Native gas token: USDC (phí gas bằng đô, không volatile). EURC và USYC cũng được hỗ trợ native
 - Chain ID: 5042002 (hex: 0x4cef52)
-- Consensus: Malachite engine — finality dưới 1 giây
-- EVM Compatible: Có — dùng Solidity, Hardhat, Foundry, ethers.js
+- Block time: ~0.48 giây (testnet)
+- Consensus: Malachite BFT — sub-second deterministic finality
+- Execution: Reth (Rust Ethereum client) — EVM Prague hard fork
+- EVM Compatible: Có — Solidity, Hardhat, Foundry, Viem, ethers.js hoạt động không cần sửa
+- Validator: Permissioned validators, Developer access: Permissionless
 - Trạng thái: Public Testnet (ra mắt 28/10/2025), Mainnet dự kiến 2026
 - Launch partners: 100+ tổ chức gồm BlackRock, Visa, HSBC`,
 
-  network: `THÔNG TIN MẠNG ARC TESTNET:
+  network: `THÔNG TIN KẾT NỐI ARC TESTNET (từ docs.arc.io):
 - RPC URL: https://rpc.testnet.arc.network
 - Chain ID: 5042002
-- Symbol: USDC
+- Gas token: USDC (native, 18 decimals cho gas; ERC-20 interface dùng 6 decimals)
 - Explorer: https://testnet.arcscan.app
-- Faucet: https://faucet.circle.com (1 USDC/ngày)
-- Block time: < 1 giây`,
+- Faucet: https://faucet.circle.com (chọn ARC Testnet, lấy USDC hoặc EURC)
+- Docs: https://docs.arc.io
+- MCP Server cho AI: https://docs.arc.io/ai/mcp`,
 
-  features: `TÍNH NĂNG NỔI BẬT:
-1. Dollar fees: Gas phí bằng USDC — predictable, không volatile
-2. Sub-second finality: Confirm dưới 1 giây, deterministic
-3. Opt-in Privacy: Tùy chọn privacy cho enterprise
-4. StableFX: Built-in FX engine cho stablecoin settlement 24/7
-5. CCTP: Circle Cross-Chain Transfer Protocol
-6. AI-native: Tích hợp Anthropic Claude Agent SDK
-7. EVM: Tương thích hoàn toàn với Ethereum tooling`,
+  contracts: `CONTRACT ADDRESSES TRÊN ARC TESTNET (chính thức từ docs.arc.io):
 
-  build: `HƯỚNG DẪN BUILD TRÊN ARC:
+Stablecoins:
+- USDC: 0x3600000000000000000000000000000000000000 (ERC-20, 6 decimals)
+- EURC: 0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a (6 decimals)
+- USYC: 0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C (yield-bearing, institutional only)
 
-Bước 1 - Thêm mạng vào ví:
-  RPC: https://rpc.testnet.arc.network | Chain ID: 5042002 | Symbol: USDC
+CCTP (Crosschain Transfer Protocol, Domain 26):
+- TokenMessengerV2: 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA
+- MessageTransmitterV2: 0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275
+
+Gateway:
+- GatewayWallet: 0x0077777d7EBA4688BDeF3E311b846F25870A19B9
+- GatewayMinter: 0x0022222ABE238Cc2C7Bb1f21003F0a260052475B
+
+StableFX:
+- FxEscrow: 0x867650F5eAe8df91445971f14d89fd84F0C9a9f8
+
+Common EVM:
+- CREATE2 Factory: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+- Multicall3: 0xcA11bde05977b3631167028862bE2a173976CA11`,
+
+  features: `TÍNH NĂNG NỔI BẬT CỦA ARC (từ docs.arc.io/arc-chain):
+
+1. Stablecoin native model: USDC là gas token. Không cần token riêng volatile. EURC và USYC được hỗ trợ native.
+2. Stable fee design: Gas phí tính bằng USDC — predictable, không bị biến động theo thị trường
+3. Deterministic finality: Giao dịch final dưới 1 giây, không bao giờ bị reorg
+4. EVM compatibility: Deploy Solidity với Hardhat, Foundry, Viem, ethers.js — không cần sửa code
+5. Opt-in Privacy: ArcaneVM — chạy Solidity contract bí mật, chỉ reveal cho người được chọn
+6. Post-quantum security: SLH-DSA-SHA2-128s wallet signatures bảo vệ khỏi quantum attacks
+7. App Kit: SDK cho Bridge, Swap, Send, Unified Balance crosschain
+8. AI-native: MCP Server cho AI agents, ERC-8004 onchain identity, ERC-8183 job escrow`,
+
+  build: `HƯỚNG DẪN BUILD TRÊN ARC (từ docs.arc.io/build):
+
+Bước 1 - Kết nối mạng:
+  RPC: https://rpc.testnet.arc.network
+  Chain ID: 5042002 | Symbol: USDC
+  Explorer: https://testnet.arcscan.app
 
 Bước 2 - Lấy testnet USDC:
-  Faucet: https://faucet.circle.com (chọn ARC Testnet)
+  https://faucet.circle.com → chọn ARC Testnet → nhận USDC/EURC
 
-Bước 3 - Deploy contract với ethers.js:
+Bước 3 - Deploy contract (ethers.js):
   const provider = new ethers.JsonRpcProvider('https://rpc.testnet.arc.network')
   const wallet = new ethers.Wallet(privateKey, provider)
+  // Deploy như Ethereum thông thường
 
-Bước 4 - Công cụ dev hỗ trợ:
-  Hardhat, Foundry, Thirdweb SDK, Alchemy RPC, The Graph
+Bước 4 - Hardhat config:
+  networks: { arc: { url: 'https://rpc.testnet.arc.network', chainId: 5042002 } }
 
-Tài liệu: https://docs.arc.network
-Explorer: https://testnet.arcscan.app`,
+Bước 5 - Foundry:
+  forge create --rpc-url https://rpc.testnet.arc.network --private-key $KEY src/Contract.sol:Contract
 
-  ecosystem: `HỆ SINH THÁI ARC:
-💼 Wallets: MetaMask, Ledger, Fireblocks, Exodus, Rainbow, Privy, Turnkey
-🛠️ Dev Tools: Alchemy, Chainlink, Thirdweb, ZeroDev, Pimlico, The Graph, Crossmint, LayerZero, Fun.xyz
-🌉 Crosschain: Across, Stargate, Wormhole
-🤖 AI: Anthropic Claude Agent SDK
-🏦 Enterprise: BlackRock, Visa, HSBC, Circle
-📊 Indexing: The Graph (https://thegraph.com/docs/en/supported-networks/arc-testnet/)`,
+Tutorials chính thức:
+- Deploy contract: https://docs.arc.io/arc/tutorials/deploy-on-arc
+- Interact với contract: https://docs.arc.io/arc/tutorials/interact-with-contracts
+- Monitor events: https://docs.arc.io/arc/tutorials/monitor-contract-events
+- Register AI Agent: https://docs.arc.io/arc/tutorials/register-your-first-ai-agent
+- ERC-8183 Job: https://docs.arc.io/arc/tutorials/create-your-first-erc-8183-job`,
 
-  usecases: `USE CASES TRÊN ARC:
-- Cross-border payments (thanh toán xuyên biên giới tức thì)
-- Capital markets (thị trường vốn on-chain)
-- Stablecoin FX (ngoại hối stablecoin real-time 24/7)
-- AI Agent payments (AI agents tự động thanh toán)
-- eCommerce checkout (USDC native)
-- Treasury management
-- DeFi: AMM, lending, stableswap
-- NFT collections (ERC721)
-- Token launches (ERC20, memecoin)`,
+  appkit: `APP KIT — SDK CROSSCHAIN CỦA ARC (docs.arc.io/app-kit):
+
+App Kit cung cấp 4 capabilities chính:
+1. Bridge: Transfer USDC giữa các chain (EVM, Solana, Circle Wallets) qua CCTP
+2. Swap: Đổi token trên cùng chain hoặc crosschain
+3. Send: Gửi token wallet-to-wallet
+4. Unified Balance: Gộp USDC từ nhiều chain thành 1 balance duy nhất, spend được ngay
+
+Cài đặt:
+  npx skills add circlefin/skills (Vercel)
+  /plugin install circle-skills@circle (Claude Code)
+
+Adapters: Viem, Ethers, Solana, Circle Wallets
+Docs: https://docs.arc.io/app-kit`,
+
+  ai_agents: `AI AGENTS TRÊN ARC (docs.arc.io/build/agentic-economy):
+
+Arc có chuẩn riêng cho AI agents:
+- ERC-8004: Onchain identity và reputation cho AI agents
+- ERC-8183: Job escrow — AI agent nhận việc, làm xong, nhận tiền tự động
+- MCP Server: Connect AI tools (Claude, Cursor...) trực tiếp vào ARC docs
+
+Register AI Agent:
+  Tutorial: https://docs.arc.io/arc/tutorials/register-your-first-ai-agent
+
+Tạo Job cho AI Agent:
+  Tutorial: https://docs.arc.io/arc/tutorials/create-your-first-erc-8183-job
+
+booAI_bot đang dùng Claude AI + ARC Testnet để làm AI agent đầu tiên của cộng đồng!`,
+
+  ecosystem: `HỆ SINH THÁI & TOOLS ARC (từ docs.arc.io/arc/tools):
+
+💼 Wallets: MetaMask, Ledger, Fireblocks, Exodus, Rainbow, Privy, Turnkey, Vultisig
+
+🛠️ Dev Tools:
+- Node Providers: Alchemy (https://www.alchemy.com/rpc/arc-testnet), GetBlock
+- SDK: Thirdweb (https://thirdweb.com/arc-testnet), ZeroDev, Pimlico
+- Oracles: Chainlink price feeds
+- Indexing: The Graph (https://thegraph.com/docs/en/supported-networks/arc-testnet/)
+- Account Abstraction: ZeroDev, Pimlico (ERC-4337, ERC-7702)
+- Compliance: Analytics và screening tools
+
+🌉 Crosschain: Across, Stargate, Wormhole, LayerZero, CCTP v2
+
+🤖 AI: Anthropic Claude Agent SDK, MCP Server
+
+🏦 Enterprise: BlackRock, Visa, HSBC, Crossmint, Dynamic, Fun.xyz`,
+
+  usecases: `USE CASES TRÊN ARC (từ docs.arc.io/build):
+
+1. Peer-to-peer payments: Thanh toán tức thì, phí thấp, settlement deterministic
+   Docs: https://docs.arc.io/build/payments
+
+2. eCommerce checkout: Nhận USDC trong store, fast settlement, built-in compliance
+   Docs: https://docs.arc.io/build/ecommerce
+
+3. Stablecoin FX: Real-time onchain FX với StableFX, transparent pricing
+   Docs: https://docs.arc.io/build/stablecoin-fx
+
+4. Agentic economy: AI agents tự coordinate, contract, settle value real-time
+   Docs: https://docs.arc.io/build/agentic-economy
+
+5. Capital markets: Tokenized assets, lending, treasury management
+
+6. DeFi: AMM (StableSwap), yield (USYC), crosschain liquidity`,
 
   news: `TIN TỨC & ROADMAP ARC:
-- 28/10/2025: Arc Public Testnet ra mắt với 100+ launch partners
-- Q4/2025: Tích hợp Alchemy, Chainlink, Thirdweb, LayerZero
+- 28/10/2025: Arc Public Testnet ra mắt với 100+ launch partners (BlackRock, Visa, HSBC)
+- Q4/2025: Tích hợp Alchemy, Chainlink, Thirdweb, LayerZero, ZeroDev
 - Q1/2026: StableFX beta, crosschain bridges (Across, Wormhole, Stargate)
-- Q2/2026: Continued testnet development, community builder program
-- 2026: Mainnet ra mắt (Circle chưa công bố ngày cụ thể)
-- Circle đang xem xét native Arc token cho governance (đề cập trong Q3/2025 earnings)
-- booAI_bot là AI agent đầu tiên của cộng đồng build trên Arc Testnet!`,
+- Q2/2026: App Kit (Bridge, Swap, Unified Balance), AI MCP Server
+- 2026: Mainnet dự kiến ra mắt
+- Circle đang xem xét native Arc token cho governance
+- ERC-8004 và ERC-8183 — chuẩn mới cho AI agents on-chain
+- booAI_bot là AI agent đầu tiên của cộng đồng build trên Arc!`,
 
   community: `CỘNG ĐỒNG & TÀI NGUYÊN ARC:
 🌐 Website: https://arc.io
-📚 Docs: https://docs.arc.network
+📚 Docs chính thức: https://docs.arc.io
+📋 Docs index cho AI: https://docs.arc.io/llms.txt
 🔍 Explorer: https://testnet.arcscan.app
 💧 Faucet: https://faucet.circle.com
 🐙 GitHub examples: https://github.com/topics/arc-network
 📊 The Graph: https://thegraph.com/docs/en/supported-networks/arc-testnet/
 ⚡ Alchemy: https://www.alchemy.com/rpc/arc-testnet
 🛠️ Thirdweb: https://thirdweb.com/arc-testnet
-📰 Blog: https://arc.io/blog`,
+📰 Blog: https://arc.io/blog
+🤖 MCP Server: https://docs.arc.io/ai/mcp`,
 
-  projects: `DỰ ÁN CỘNG ĐỒNG TRÊN ARC (từ GitHub):
+  projects: `DỰ ÁN CỘNG ĐỒNG & SAMPLE APPS TRÊN ARC:
+
+Sample apps chính thức (Circle GitHub):
+- CCTP demo: Cross-chain USDC transfer
+- USDC payment integration
+- Sample dApps: https://docs.arc.io/arc/references/sample-applications
+
+Community projects (GitHub topics/arc-network):
 - Decentralized Voting dApp (Solidity + ethers.js)
-- StableSwap AMM (Curve-inspired, React frontend)
-- Stripe + Arc USDC payout integration
+- StableSwap AMM (Curve-inspired, React)
+- Stripe + Arc USDC payout playbook
 - Circle ENS + USDC projects
-Xem thêm: https://github.com/topics/arc-network`,
+
+Build và share dự án của bạn tại: https://github.com/topics/arc-network`,
 }
 
 // Detect xem câu hỏi có liên quan đến ARC knowledge không
@@ -120,6 +219,15 @@ function isArcKnowledgeQuestion(text) {
     'arc thirdweb', 'arc alchemy', 'arc chainlink',
     'arc là', 'what is arc', 'tell me about arc',
     'arc có gì', 'arc như thế nào',
+    'contract address', 'địa chỉ contract', 'usdc address',
+    'cctp', 'app kit', 'unified balance', 'bridge usdc',
+    'erc-8004', 'erc-8183', 'ai agent arc', 'register agent',
+    'arc mcp', 'circle skill', 'arcanevm', 'opt-in privacy',
+    'post-quantum', 'malachite bft', 'reth arc',
+    'hardhat arc', 'foundry arc', 'deploy solidity arc',
+    'arc block time', 'arc finality', 'arc validator',
+    'eurc', 'usyc', 'stablecoin arc', 'arc fee',
+    'arcscan', 'arc explorer', 'arc sample',
   ]
   return arcKeywords.some(k => t.includes(k))
 }
@@ -155,6 +263,16 @@ function buildArcContext(text) {
   }
   if (t.includes('project') || t.includes('dự án') || t.includes('github') || t.includes('open source') || t.includes('mã nguồn')) {
     ctx += ARC_KB.projects + '\n\n'
+  }
+
+  if (t.includes('contract') || t.includes('address') || t.includes('usdc address') || t.includes('cctp') || t.includes('gateway') || t.includes('stablefx address')) {
+    ctx += ARC_KB.contracts + '\n\n'
+  }
+  if (t.includes('app kit') || t.includes('appkit') || t.includes('unified balance') || t.includes('bridge') || t.includes('swap') || t.includes('crosschain')) {
+    ctx += ARC_KB.appkit + '\n\n'
+  }
+  if (t.includes('ai agent') || t.includes('erc-8004') || t.includes('erc-8183') || t.includes('agentic') || t.includes('register agent') || t.includes('job escrow') || t.includes('mcp')) {
+    ctx += ARC_KB.ai_agents + '\n\n'
   }
 
   // Nếu không match cụ thể → trả overview + ecosystem
