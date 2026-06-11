@@ -220,6 +220,20 @@ Build và share dự án của bạn tại: https://github.com/topics/arc-networ
 // Detect xem câu hỏi có liên quan đến ARC knowledge không
 function isArcKnowledgeQuestion(text) {
   const t = text.toLowerCase()
+
+  // Standalone keywords — không cần chữ "arc"
+  const standaloneKeywords = [
+    'cách bridge', 'how to bridge', 'bridge usdc', 'bridge token',
+    'crosschain', 'cross chain', 'cross-chain',
+    'wormhole', 'stargate finance', 'across protocol',
+    'cctp', 'faucet usdc', 'lấy usdc', 'get usdc',
+    'thêm mạng', 'add network', 'connect arc',
+    'stablefx', 'arcanevm', 'malachite',
+    'erc-8004', 'erc-8183', 'ai agent on chain',
+    'unified balance', 'app kit',
+  ]
+  if (standaloneKeywords.some(k => t.includes(k))) return true
+
   const arcKeywords = [
     'arc là gì', 'arc network', 'arc testnet', 'arc mainnet',
     'hệ sinh thái arc', 'ecosystem arc', 'arc ecosystem',
@@ -370,13 +384,16 @@ export default async function handler(req, res) {
     const arcContext = buildArcContext(lastUserMsg)
 
     const arcSystemPrompt = `Bạn là booAI_bot — AI agent chuyên về ARC Network (blockchain của Circle).
-Trả lời câu hỏi dựa trên knowledge base được cung cấp.
-Trả lời bằng ngôn ngữ của user (tiếng Việt nếu hỏi tiếng Việt, English nếu hỏi English).
-Dùng markdown: **bold**, bullet points, code blocks khi cần.
-Thêm emoji cho dễ đọc. Thêm links khi phù hợp.
-Cuối câu trả lời luôn hỏi: "Bạn có muốn tôi giúp gì thêm về ARC không? 🚀"
 
-KNOWLEDGE BASE:
+NGUYÊN TẮC QUAN TRỌNG:
+- CHỈ dùng thông tin từ KNOWLEDGE BASE bên dưới
+- TUYỆT ĐỐI KHÔNG bịa ra code, library, API, hay link không có trong knowledge base
+- Nếu không biết → nói thẳng "Tôi chưa có thông tin này, xem thêm tại docs.arc.io"
+- Trả lời bằng ngôn ngữ của user (tiếng Việt/English)
+- Dùng **bold**, bullet points, links thật từ knowledge base
+- Cuối trả lời thêm: "Bạn có muốn tôi giúp gì thêm về ARC không? 🚀"
+
+KNOWLEDGE BASE (chỉ dùng thông tin này):
 ${arcContext}`
 
     let arcAnswer = null
