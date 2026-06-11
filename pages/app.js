@@ -55,6 +55,9 @@ export default function App() {
   const fileInputRef = useRef(null)
   const pendingTaskRef = useRef(null)
   const [showEmailWallet, setShowEmailWallet] = useState(false)
+  const [showExportKey, setShowExportKey] = useState(false)
+  const [exportedKey, setExportedKey] = useState('')
+  const [keyVisible, setKeyVisible] = useState(false)
   const [emailTo, setEmailTo] = useState('')
   const [sendAmount, setSendAmount] = useState('')
   const [sending, setSending] = useState(false)
@@ -211,6 +214,19 @@ export default function App() {
       from: txParams.from,
     })
     return tx.hash
+  }
+
+  // Export private key cho email wallet
+  const exportPrivateKey = async () => {
+    if (walletType !== 'email' || !walletEmail) return
+    try {
+      const { privateKey } = await deriveWalletFromEmail(walletEmail)
+      setExportedKey(privateKey)
+      setShowExportKey(true)
+      setKeyVisible(false)
+    } catch (err) {
+      addMessage('ai', '❌ Could not export key: ' + err.message)
+    }
   }
 
   const disconnectWallet = async () => {
@@ -487,6 +503,11 @@ export default function App() {
                   <div className="wallet-addr">{shortAddr}</div>
                   {walletEmail && <div className="wallet-email-label">{walletEmail}</div>}
                   <div className="wallet-net"><div className="wallet-dot" />ARC Testnet · Connected</div>
+                  {walletType === 'email' && (
+                    <button onClick={exportPrivateKey} style={{marginTop:6,width:'100%',padding:'7px',background:'transparent',border:'1px solid rgba(139,111,255,0.3)',borderRadius:7,color:'#8b6fff',fontSize:12,cursor:'pointer',transition:'all 0.2s'}}>
+                      🔑 Export Private Key
+                    </button>
+                  )}
                   <button className="btn-disconnect" onClick={disconnectWallet}>Disconnect</button>
                 </div>
               ) : (
@@ -770,6 +791,73 @@ export default function App() {
                 <div style={{fontSize:10,color:'#3a3a52',textAlign:'center',marginTop:12,fontFamily:'Space Mono,monospace'}}>ARC Testnet · USDC Native · No extra fees</div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== EXPORT PRIVATE KEY MODAL ===== */}
+      {showExportKey && (
+        <div className="modal-overlay" onClick={() => { setShowExportKey(false); setExportedKey(''); setKeyVisible(false) }}>
+          <div style={{background:'#0d0d1a',border:'1px solid rgba(255,100,100,0.3)',borderRadius:16,padding:32,width:480,maxWidth:'90vw'}} onClick={e => e.stopPropagation()}>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,marginBottom:4,color:'#ff6b6b'}}>🔑 Private Key</div>
+            <div style={{fontSize:13,color:'#52526a',marginBottom:20,lineHeight:1.7}}>
+              Email: <span style={{color:'#8b6fff',fontFamily:'Space Mono,monospace'}}>{walletEmail}</span>
+            </div>
+
+            {/* WARNING */}
+            <div style={{background:'rgba(255,100,100,0.08)',border:'1px solid rgba(255,100,100,0.25)',borderRadius:10,padding:'14px 16px',marginBottom:20}}>
+              <div style={{fontSize:13,fontWeight:600,color:'#ff6b6b',marginBottom:6}}>⚠️ CẢNH BÁO BẢO MẬT</div>
+              <div style={{fontSize:12,color:'#ff9999',lineHeight:1.7}}>
+                • KHÔNG chia sẻ private key với bất kỳ ai<br/>
+                • KHÔNG paste vào website lạ<br/>
+                • Lưu vào nơi an toàn (offline tốt nhất)<br/>
+                • Ai có key này = kiểm soát hoàn toàn ví của bạn
+              </div>
+            </div>
+
+            {/* Key display */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,color:'#52526a',fontFamily:'Space Mono,monospace',marginBottom:8}}>PRIVATE KEY</div>
+              <div style={{position:'relative'}}>
+                <div style={{
+                  background:'#06060f',
+                  border:'1px solid rgba(255,255,255,0.1)',
+                  borderRadius:8,
+                  padding:'12px 48px 12px 14px',
+                  fontFamily:'Space Mono,monospace',
+                  fontSize:11,
+                  color: keyVisible ? '#00d4aa' : 'transparent',
+                  textShadow: keyVisible ? 'none' : '0 0 8px rgba(0,212,170,0.8)',
+                  wordBreak:'break-all',
+                  lineHeight:1.8,
+                  userSelect: keyVisible ? 'text' : 'none',
+                  filter: keyVisible ? 'none' : 'blur(4px)',
+                }}>
+                  {exportedKey}
+                </div>
+                <button onClick={() => setKeyVisible(!keyVisible)} style={{
+                  position:'absolute',top:'50%',right:12,transform:'translateY(-50%)',
+                  background:'transparent',border:'none',color:'#52526a',cursor:'pointer',fontSize:18
+                }}>
+                  {keyVisible ? '🙈' : '👁️'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={() => { navigator.clipboard.writeText(exportedKey); addMessage('ai', '✅ Private key đã được copy vào clipboard. Hãy lưu vào nơi an toàn!') }}
+                style={{flex:1,padding:12,background:'rgba(0,212,170,0.1)',border:'1px solid rgba(0,212,170,0.3)',borderRadius:10,color:'#00d4aa',fontSize:13,cursor:'pointer',fontWeight:500}}>
+                📋 Copy Key
+              </button>
+              <button onClick={() => { setShowExportKey(false); setExportedKey(''); setKeyVisible(false) }}
+                style={{flex:1,padding:12,background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:10,color:'#52526a',fontSize:13,cursor:'pointer'}}>
+                Đóng
+              </button>
+            </div>
+
+            <div style={{fontSize:11,color:'#3a3a52',textAlign:'center',marginTop:16,fontFamily:'Space Mono,monospace',lineHeight:1.6}}>
+              Key này được tạo từ email của bạn.<br/>Import vào MetaMask: Accounts → Import Account → Paste key
+            </div>
           </div>
         </div>
       )}
