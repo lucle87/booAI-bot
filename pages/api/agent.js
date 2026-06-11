@@ -95,20 +95,37 @@ Tutorials chính thức:
 - Register AI Agent: https://docs.arc.io/arc/tutorials/register-your-first-ai-agent
 - ERC-8183 Job: https://docs.arc.io/arc/tutorials/create-your-first-erc-8183-job`,
 
-  appkit: `APP KIT — SDK CROSSCHAIN CỦA ARC (docs.arc.io/app-kit):
+  appkit: `APP KIT & BRIDGE USDC TRÊN ARC (docs.arc.io/app-kit):
 
-App Kit cung cấp 4 capabilities chính:
+CÁCH BRIDGE USDC VÀO ARC TESTNET:
+
+Cách 1 — Thirdweb Bridge (đơn giản nhất):
+  1. Vào https://thirdweb.com/arc-testnet
+  2. Kết nối ví → chọn chain nguồn → nhập USDC → bridge sang ARC Testnet
+  Link: https://thirdweb.com/arc-testnet
+
+Cách 2 — Lấy thẳng từ Faucet (không cần bridge):
+  1. Vào https://faucet.circle.com
+  2. Chọn ARC Testnet → nhận 1 USDC/ngày trực tiếp
+  Link: https://faucet.circle.com
+
+Cách 3 — Circle CCTP (developer):
+  Dùng TokenMessengerV2: 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA
+  Docs: https://docs.arc.io/app-kit/quickstarts/bridge-tokens-across-blockchains
+
+Cách 4 — Wormhole / Stargate / Across:
+  Các bridge bên thứ 3 đã integrate ARC Testnet
+  - Wormhole: https://wormhole.com
+  - Stargate: https://stargate.finance
+  - Across: https://across.to
+
+App Kit capabilities:
 1. Bridge: Transfer USDC giữa các chain (EVM, Solana, Circle Wallets) qua CCTP
 2. Swap: Đổi token trên cùng chain hoặc crosschain
 3. Send: Gửi token wallet-to-wallet
-4. Unified Balance: Gộp USDC từ nhiều chain thành 1 balance duy nhất, spend được ngay
+4. Unified Balance: Gộp USDC từ nhiều chain thành 1 balance duy nhất
 
-Cài đặt:
-  npx skills add circlefin/skills (Vercel)
-  /plugin install circle-skills@circle (Claude Code)
-
-Adapters: Viem, Ethers, Solana, Circle Wallets
-Docs: https://docs.arc.io/app-kit`,
+Docs đầy đủ: https://docs.arc.io/app-kit`,
 
   ai_agents: `AI AGENTS TRÊN ARC (docs.arc.io/build/agentic-economy):
 
@@ -228,6 +245,10 @@ function isArcKnowledgeQuestion(text) {
     'arc block time', 'arc finality', 'arc validator',
     'eurc', 'usyc', 'stablecoin arc', 'arc fee',
     'arcscan', 'arc explorer', 'arc sample',
+    'bridge usdc', 'cách bridge', 'how to bridge', 'bridge token',
+    'crosschain transfer', 'chuyển usdc qua chain', 'cross chain',
+    'wormhole', 'stargate', 'across protocol', 'layerzero',
+    'cctp transfer', 'circle bridge', 'thirdweb bridge',
   ]
   return arcKeywords.some(k => t.includes(k))
 }
@@ -393,6 +414,10 @@ CRITICAL RULES:
 FAUCET INFO (when user asks):
 - Get USDC: https://faucet.circle.com → Select ARC Testnet → USDC
 - Add network: Name=ARC Testnet, ChainID=5042002, RPC=https://rpc.testnet.arc.network, Symbol=USDC
+
+IMPORTANT: If user asks HOW TO DO something (bridge, transfer, swap, faucet, connect wallet), 
+answer with instructions directly — do NOT start collecting task params.
+Only collect params when user explicitly says "deploy", "create", "generate", "mint", "audit".
 
 CAPABILITIES & REQUIRED PARAMS:
 1. DEPLOY_ERC20: name, symbol, totalSupply (decimals=18 default)
